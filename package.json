@@ -1,0 +1,28 @@
+{
+  "name": "pw-client",
+  "version": "1.0.0",
+  "description": "Node.js wrapper for developing PipeWire clients",
+  "keywords": [
+    "sound",
+    "pipewire",
+    "linux"
+  ],
+  "author": "Jacob Page <jacob.h.page@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.1",
+    "@types/node": "^22.15.3",
+    "node-addon-api": "^8.3.1",
+    "node-gyp": "^11.2.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "build": "npm run build:native:debug && npx tsc",
+    "build:native": "node-gyp build",
+    "build:native:debug": "npm run build:native -- --debug"
+  }
+}
