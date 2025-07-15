@@ -253,6 +253,43 @@ stream.on("formatChange", (format) => {
 
 ---
 
+## 📅 July 14, 2025
+
+### Sample Rate Negotiation Implementation ✅
+
+- **Enhanced Audio Quality API**: Extended the quality-based system to include sample rate negotiation alongside format negotiation
+- **Quality-Based Rate Preferences**:
+
+  - `AudioQuality.High`: Prefers ultra-high rates (192kHz → 96kHz → 88.2kHz → 48kHz → 44.1kHz)
+  - `AudioQuality.Standard`: Balanced approach (48kHz → 44.1kHz → 96kHz → 88.2kHz → 32kHz)
+  - `AudioQuality.Efficient`: Performance optimized (44.1kHz → 48kHz → 32kHz → 22.05kHz → 16kHz)
+
+- **API Extensions**:
+
+  - Added `preferredRates?: number[]` option to `AudioOutputStreamOpts`
+  - Added `getRatePreferences(quality)` function for mapping quality to rates
+  - Extended C++ `buildFormatParams()` to support rate choice negotiation via SPA_CHOICE_Enum
+  - Updated native `connect()` method to accept both format and rate preferences
+
+- **Benefits**:
+
+  - Users can now specify quality levels that intelligently select both format AND sample rate
+  - Manual override still available via `preferredRates` option
+  - Automatic negotiation with audio device capabilities
+  - Better performance on resource-constrained systems via quality-appropriate rate selection
+
+- **Documentation**: Updated `AUDIO_QUALITY_API.md` with comprehensive rate negotiation guide and migration examples
+
+### Current Implementation Status 🎯
+
+- **Format Negotiation**: ✅ Complete - Quality levels map to format preferences
+- **Rate Negotiation**: ✅ Complete - Quality levels now include rate preferences
+- **Quality-Based API**: ✅ Complete - Single `quality` parameter controls both format and rate selection
+- **Manual Override**: ✅ Complete - Both `preferredFormats` and `preferredRates` options available
+- **Device Adaptation**: ✅ Complete - Automatic negotiation with PipeWire device capabilities
+
+---
+
 ## 📝 Template for Future Entries
 
 ### [Date] - [Feature/Task Name]

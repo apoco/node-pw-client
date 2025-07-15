@@ -188,7 +188,8 @@ std::vector<spa_audio_format> AudioOutputStream::parsePreferredFormats(const Nap
 }
 
 void AudioOutputStream::buildFormatParams(struct spa_pod_builder& podBuilder,
-    const std::vector<spa_audio_format>& preferredFormats)
+    const std::vector<spa_audio_format>& preferredFormats,
+    const std::vector<uint32_t>& preferredRates)
 {
     struct spa_pod_frame formatFrame;
     spa_pod_builder_push_object(&podBuilder, &formatFrame, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
@@ -209,18 +210,32 @@ void AudioOutputStream::buildFormatParams(struct spa_pod_builder& podBuilder,
         spa_pod_builder_pop(&podBuilder, &choiceFrame);
     }
 
-    spa_pod_builder_add(&podBuilder, SPA_FORMAT_AUDIO_rate, SPA_POD_Int(this->rate), 0);
+    // Add rate choices - negotiate sample rate based on preferences
+    if (preferredRates.size() == 1) {
+        spa_pod_builder_add(&podBuilder, SPA_FORMAT_AUDIO_rate, SPA_POD_Int(preferredRates[0]), 0);
+    } else {
+        struct spa_pod_frame choiceFrame;
+        spa_pod_builder_prop(&podBuilder, SPA_FORMAT_AUDIO_rate, 0);
+        spa_pod_builder_push_choice(&podBuilder, &choiceFrame, SPA_CHOICE_Enum, 0);
+        spa_pod_builder_int(&podBuilder, preferredRates[0]); // Default/preferred
+        for (auto rate : preferredRates) {
+            spa_pod_builder_int(&podBuilder, rate);
+        }
+        spa_pod_builder_pop(&podBuilder, &choiceFrame);
+    }
+
     spa_pod_builder_add(&podBuilder, SPA_FORMAT_AUDIO_channels, SPA_POD_Int(this->channels), 0);
     spa_pod_builder_pop(&podBuilder, &formatFrame);
 }
 
-void AudioOutputStream::connectStream(const std::vector<spa_audio_format>& preferredFormats)
+void AudioOutputStream::connectStream(const std::vector<spa_audio_format>& preferredFormats,
+    const std::vector<uint32_t>& preferredRates)
 {
-    session->withThreadLock([this, preferredFormats]() {
+    session->withThreadLock([this, preferredFormats, preferredRates]() {
         uint8_t buffer[4096]; // Larger buffer for multiple formats
         struct spa_pod_builder podBuilder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
-        buildFormatParams(podBuilder, preferredFormats);
+        buildFormatParams(podBuilder, preferredFormats, preferredRates);
 
         const struct spa_pod* connectParams[1] = {
             (struct spa_pod*)buffer
@@ -248,11 +263,12 @@ Napi::Value AudioOutputStream::connect(const Napi::CallbackInfo& info)
 
     try {
         auto preferredFormats = parsePreferredFormats(options);
+        auto preferredRates = parsePreferredRates(options);
 
         return async(
             env,
-            [this, preferredFormats]() {
-                connectStream(preferredFormats);
+            [this, preferredFormats, preferredRates]() {
+                connectStream(preferredFormats, preferredRates);
             },
             [env]() {
                 return env.Undefined();
@@ -774,4 +790,20 @@ void onProcess(void* userData)
     spaData.chunk->size = byteCount;
 
     pw_stream_queue_buffer(pwStream, pwBuffer);
+}
+
+std::vector<uint32_t> AudioOutputStream::parsePreferredRates(const Napi::Object& options)
+{
+    if (!options.Has("preferredRates") || !options.Get("preferredRates").IsArray()) {
+        // Default to the current rate if no preferred rates provided
+        return { this->rate };
+    }
+
+    std::vector<uint32_t> preferredRates;
+    auto ratesArray = options.Get("preferredRates").As<Napi::Array>();
+    for (uint32_t i = 0; i < ratesArray.Length(); i++) {
+        auto rateValue = ratesArray.Get(i).As<Napi::Number>().Uint32Value();
+        preferredRates.push_back(rateValue);
+    }
+    return preferredRates;
 }

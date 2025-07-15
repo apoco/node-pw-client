@@ -158,6 +158,96 @@ const notificationStream = await session.createAudioOutputStream({
 });
 ```
 
+## 🎵 Sample Rate Negotiation
+
+In addition to format negotiation, the Audio Quality API now includes intelligent **sample rate negotiation**. Each quality level has optimized sample rate preferences that match its intended use case.
+
+### Rate Preferences by Quality Level
+
+#### AudioQuality.High
+
+- **Target use**: Music production, mastering, critical listening
+- **Rate preference**: 192kHz → 96kHz → 88.2kHz → 48kHz → 44.1kHz
+- **Rationale**: Prefers ultra-high definition rates for professional audio work
+
+#### AudioQuality.Standard
+
+- **Target use**: General music playback, games, most applications
+- **Rate preference**: 48kHz → 44.1kHz → 96kHz → 88.2kHz → 32kHz
+- **Rationale**: Balances quality and compatibility with modern professional standard
+
+#### AudioQuality.Efficient
+
+- **Target use**: Voice, system sounds, resource-constrained environments
+- **Rate preference**: 44.1kHz → 48kHz → 32kHz → 22.05kHz → 16kHz
+- **Rationale**: Optimizes for performance while maintaining acceptable quality
+
+### Quality + Rate API Usage
+
+```typescript
+// Simple: Quality level controls both format AND rate
+const stream = await session.createAudioOutputStream({
+  quality: AudioQuality.High, // Automatically prefers high sample rates
+  channels: 2,
+  role: "Music",
+});
+
+await stream.connect();
+console.log(`Negotiated: ${stream.format.description} @ ${stream.rate}Hz`);
+```
+
+### Manual Rate Override
+
+```typescript
+// Override rates while keeping quality-based format selection
+const stream = await session.createAudioOutputStream({
+  quality: AudioQuality.Standard,
+  preferredRates: [192_000, 96_000, 48_000], // Custom rate preferences
+  channels: 2,
+});
+
+// Full manual control of both formats and rates
+const stream = await session.createAudioOutputStream({
+  preferredFormats: [AudioFormat.Float64, AudioFormat.Float32],
+  preferredRates: [48_000, 44_100],
+  channels: 2,
+});
+```
+
+### Benefits of Rate Negotiation
+
+1. **Adaptive Quality**: Automatically uses the best sample rate your hardware supports
+2. **Use-Case Optimized**: Each quality level targets appropriate rates for its use case
+3. **Backward Compatible**: Existing code continues to work unchanged
+4. **Performance Aware**: Efficient quality avoids unnecessarily high rates
+5. **Professional Ready**: High quality targets professional audio standards
+
+### Migration from Fixed Rates
+
+**Before** (fixed rate):
+
+```typescript
+// Might fail if device doesn't support this exact rate
+const stream = await session.createAudioOutputStream({
+  rate: 96_000, // Rigid requirement
+  channels: 2,
+});
+```
+
+**After** (negotiated rate):
+
+```typescript
+// Automatically finds the best supported rate
+const stream = await session.createAudioOutputStream({
+  quality: AudioQuality.High, // Prefers high rates including 96kHz
+  channels: 2,
+});
+
+await stream.connect();
+// Rate is now negotiated and guaranteed to work
+console.log(`Using ${stream.rate}Hz`);
+```
+
 ## 🔧 Advanced Usage
 
 ### Quality Information

@@ -1,13 +1,20 @@
 import EventEmitter, { once } from "node:events";
 import { AudioFormat } from "./audio-format.mjs";
-import { AudioQuality, getFormatPreferences } from "./audio-quality.mjs";
+import {
+  AudioQuality,
+  getFormatPreferences,
+  getRatePreferences,
+} from "./audio-quality.mjs";
 import { NativePipeWireSession } from "./session.mjs";
 import * as Props from "./props.mjs";
 import { Latency, StreamState, streamStateToName } from "./stream.mjs";
 import { adaptSamples } from "./format-negotiation.mjs";
 
 export type NativeAudioOutputStream = {
-  connect: (options?: { preferredFormats?: number[] }) => Promise<void>;
+  connect: (options?: {
+    preferredFormats?: number[];
+    preferredRates?: number[];
+  }) => Promise<void>;
   get bufferSize(): number;
   write: (data: ArrayBuffer) => void;
   isReady: () => Promise<number>;
@@ -33,6 +40,7 @@ export type AudioOutputStreamOpts = {
     | "Test";
   quality?: AudioQuality;
   preferredFormats?: AudioFormat[];
+  preferredRates?: number[];
 };
 
 export type AudioOutputStreamProps = {
@@ -96,6 +104,7 @@ export class AudioOutputStreamImpl
   #connectionConfig!: {
     quality: AudioQuality;
     preferredFormats?: AudioFormat[];
+    preferredRates?: number[];
   };
 
   #negotiatedFormat!: AudioFormat;
@@ -117,9 +126,10 @@ export class AudioOutputStreamImpl
       role,
       quality = AudioQuality.Standard,
       preferredFormats,
+      preferredRates,
     } = opts;
 
-    this.#connectionConfig = { quality, preferredFormats };
+    this.#connectionConfig = { quality, preferredFormats, preferredRates };
     this.#nativeStream = await this.#createNativeStream(session, {
       name,
       rate,
@@ -200,8 +210,13 @@ export class AudioOutputStreamImpl
       this.#connectionConfig.preferredFormats ??
       getFormatPreferences(this.#connectionConfig.quality);
 
+    const preferredRates =
+      this.#connectionConfig.preferredRates ??
+      getRatePreferences(this.#connectionConfig.quality);
+
     await this.#nativeStream.connect({
       preferredFormats: preferredFormats.map((f) => f.enumValue),
+      preferredRates,
     });
 
     await formatNegotiated;

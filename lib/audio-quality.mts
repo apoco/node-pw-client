@@ -69,6 +69,46 @@ const FORMAT_PREFERENCES = new Map<AudioQuality, AudioFormat[]>([
 ]);
 
 /**
+ * Sample rate preference mappings for each quality level.
+ * Higher quality levels prefer higher sample rates when available.
+ * All rates are common in professional and consumer audio.
+ */
+const RATE_PREFERENCES = new Map<AudioQuality, number[]>([
+  [
+    AudioQuality.High,
+    [
+      192_000, // Ultra-high definition audio
+      96_000, // High-resolution audio
+      88_200, // DVD-Audio/hi-res standard
+      48_000, // Professional standard
+      44_100, // CD quality
+    ],
+  ],
+
+  [
+    AudioQuality.Standard,
+    [
+      48_000, // Modern professional standard - best balance
+      44_100, // CD quality - universal compatibility
+      96_000, // High-res if available
+      88_200, // Alternative hi-res
+      32_000, // Fallback
+    ],
+  ],
+
+  [
+    AudioQuality.Efficient,
+    [
+      44_100, // CD quality - good balance of quality/performance
+      48_000, // Professional standard
+      32_000, // Lower bandwidth
+      22_050, // Voice/low quality acceptable
+      16_000, // Minimum acceptable for most audio
+    ],
+  ],
+]);
+
+/**
  * Get the optimal format preference order for a given quality level.
  * This internal function maps user-friendly quality levels to technical format negotiations.
  */
@@ -76,5 +116,16 @@ export function getFormatPreferences(quality: AudioQuality): AudioFormat[] {
   return (
     FORMAT_PREFERENCES.get(quality) ??
     FORMAT_PREFERENCES.get(AudioQuality.Standard)!
+  );
+}
+
+/**
+ * Get the optimal sample rate preference order for a given quality level.
+ * This internal function maps user-friendly quality levels to technical rate negotiations.
+ */
+export function getRatePreferences(quality: AudioQuality): number[] {
+  return (
+    RATE_PREFERENCES.get(quality) ??
+    RATE_PREFERENCES.get(AudioQuality.Standard)!
   );
 }

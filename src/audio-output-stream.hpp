@@ -85,9 +85,12 @@ private:
 
     // Helper methods for connect()
     std::vector<spa_audio_format> parsePreferredFormats(const Napi::Object& options);
+    std::vector<uint32_t> parsePreferredRates(const Napi::Object& options);
     void buildFormatParams(struct spa_pod_builder& podBuilder,
-        const std::vector<spa_audio_format>& preferredFormats);
-    void connectStream(const std::vector<spa_audio_format>& preferredFormats);
+        const std::vector<spa_audio_format>& preferredFormats,
+        const std::vector<uint32_t>& preferredRates);
+    void connectStream(const std::vector<spa_audio_format>& preferredFormats,
+        const std::vector<uint32_t>& preferredRates);
 
     void _destroy();
 };
