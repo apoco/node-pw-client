@@ -44,23 +44,27 @@ await using session = await startSession();
 // Create an audio output stream - simple quality-based API!
 await using stream = await session.createAudioOutputStream({
   name: "My Audio App",
-  quality: AudioQuality.Standard, // 🎯 Simple!
-  rate: 48_000,
+  quality: AudioQuality.Standard, // 🎯 Auto-negotiates format AND rate!
   channels: 2, // Stereo for proper playback
 });
 
 await stream.connect();
 
+// Use the negotiated values - no more hard-coded rates!
+console.log(`Connected: ${stream.format.description} @ ${stream.rate}Hz`);
+
 // Generate audio using JavaScript Numbers (range: -1.0 to +1.0)
 function* generateTone(frequency: number, duration: number) {
-  const samples = Math.floor(duration * 48_000 * 2); // stereo
-  const cycle = (Math.PI * 2) / 48_000;
+  const samples = Math.floor(duration * stream.rate * stream.channels);
+  const cycle = (Math.PI * 2) / stream.rate;
   let phase = 0;
 
-  for (let i = 0; i < samples; i += 2) {
+  for (let i = 0; i < samples; i += stream.channels) {
     const sample = Math.sin(phase * frequency) * 0.1; // 10% volume
-    yield sample; // Left channel
-    yield sample; // Right channel
+    // Generate samples for each channel
+    for (let ch = 0; ch < stream.channels; ch++) {
+      yield sample;
+    }
     phase += cycle;
   }
 }
@@ -111,17 +115,19 @@ const notificationStream = await session.createAudioOutputStream({
 ### Stereo Audio
 
 ```typescript
-// Generate stereo noise
-function* generateStereoNoise(duration: number) {
-  const samples = Math.floor(duration * 48_000 * 2);
+// Generate stereo noise using negotiated stream properties
+function* generateStereoNoise(stream: AudioOutputStream, duration: number) {
+  const samples = Math.floor(duration * stream.rate * stream.channels);
 
-  for (let i = 0; i < samples; i += 2) {
-    yield (Math.random() - 0.5) * 0.1; // Left channel
-    yield (Math.random() - 0.5) * 0.1; // Right channel
+  for (let i = 0; i < samples; i += stream.channels) {
+    // Generate samples for each channel
+    for (let ch = 0; ch < stream.channels; ch++) {
+      yield (Math.random() - 0.5) * 0.1; // Random noise per channel
+    }
   }
 }
 
-await stream.write(generateStereoNoise(3.0)); // 3 seconds
+await stream.write(generateStereoNoise(stream, 3.0)); // 3 seconds
 ```
 
 More examples available in the [`examples/`](examples/) directory.

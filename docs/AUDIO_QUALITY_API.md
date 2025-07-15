@@ -67,24 +67,28 @@ await using session = await startSession();
 
 await using stream = await session.createAudioOutputStream({
   name: "My Audio App",
-  quality: AudioQuality.Standard, // 🎯 Simple!
-  rate: 48_000,
+  quality: AudioQuality.Standard, // 🎯 Auto-negotiates format AND rate!
   channels: 2,
 });
 
 await stream.connect();
 
+// Use negotiated values from the connected stream
+console.log(`Using: ${stream.format.description} @ ${stream.rate}Hz`);
+
 // Always work with JavaScript Numbers in the range -1.0 to +1.0
 // This is the standard audio sample format used across all audio systems
 function* generateTone(frequency: number, duration: number) {
-  const samples = Math.floor(duration * 48_000 * 2); // stereo
-  const cycle = (Math.PI * 2) / 48_000;
+  const samples = Math.floor(duration * stream.rate * stream.channels);
+  const cycle = (Math.PI * 2) / stream.rate;
   let phase = 0;
 
-  for (let i = 0; i < samples; i += 2) {
+  for (let i = 0; i < samples; i += stream.channels) {
     const sample = Math.sin(phase * frequency) * 0.1; // Range: -0.1 to +0.1 (10% volume)
-    yield sample; // Left channel
-    yield sample; // Right channel
+    // Generate samples for each channel
+    for (let ch = 0; ch < stream.channels; ch++) {
+      yield sample;
+    }
     phase += cycle;
   }
 }
@@ -113,10 +117,14 @@ const normal = 0.5; // 50% volume
 const loud = 0.9; // 90% volume
 const maximum = 1.0; // 100% volume (maximum safe level)
 
-// Generate a 440Hz sine wave at 10% volume
-function* generateTone(frequency: number, volume: number) {
+// Generate a 440Hz sine wave at 10% volume using negotiated rate
+function* generateTone(
+  stream: AudioOutputStream,
+  frequency: number,
+  volume: number
+) {
   let phase = 0;
-  const cycle = (Math.PI * 2) / 48_000;
+  const cycle = (Math.PI * 2) / stream.rate; // Use negotiated sample rate
 
   while (true) {
     const sample = Math.sin(phase * frequency) * volume; // volume scales the amplitude

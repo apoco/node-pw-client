@@ -17,13 +17,10 @@ console.log(
 );
 console.log();
 
-const rate = 48_000;
-
 // Example 1: High quality for music production
 await using streamHigh = await session.createAudioOutputStream({
   name: "High Quality Demo",
-  quality: AudioQuality.High, // 🎯 Simple! No technical format knowledge needed
-  rate,
+  quality: AudioQuality.High, // 🎯 Auto-negotiates best format AND rate!
   channels: 2,
   role: "Music",
 });
@@ -32,7 +29,6 @@ await using streamHigh = await session.createAudioOutputStream({
 await using streamEfficient = await session.createAudioOutputStream({
   name: "Efficient Demo",
   quality: AudioQuality.Efficient, // 🚀 Optimized for performance
-  rate,
   channels: 2,
   role: "Notification",
 });

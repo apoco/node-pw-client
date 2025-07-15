@@ -2,14 +2,11 @@ import { startSession, AudioQuality } from "../lib/index.mjs";
 
 await using session = await startSession();
 
-const rate = 48_000;
-
 // Choose your quality level based on your application needs
 // Just specify the quality level you need - High, Standard, or Efficient
 await using stream = await session.createAudioOutputStream({
   name: "Hello, PipeWire",
-  quality: AudioQuality.High, // 🎯 Perfect for music - that's it!
-  rate,
+  quality: AudioQuality.High, // 🎯 Perfect for music - auto-negotiates rate & format!
   channels: 2, // Use stereo so mono content plays in both ears
   role: "Music", // For proper audio routing and volume control
 });
@@ -32,6 +29,10 @@ stream
 
 await stream.connect();
 
+console.log(
+  `🎵 Connected! Using ${stream.format.description} @ ${stream.rate}Hz`
+);
+
 function* amplify(volume: number, samples: Iterable<number>) {
   for (const sample of samples) {
     yield sample * volume;
@@ -44,9 +45,9 @@ function* concat(...samples: Array<Iterable<number>>) {
   }
 }
 
-function* clip(duration: number, rate: number, samples: Iterable<number>) {
+function* clip(duration: number, samples: Iterable<number>) {
   let i = 0;
-  const maxIterations = duration * rate;
+  const maxIterations = duration * stream.rate; // Use negotiated rate
   for (const sample of samples) {
     if (i++ > maxIterations) {
       break;
@@ -58,7 +59,7 @@ function* clip(duration: number, rate: number, samples: Iterable<number>) {
 
 function* sineWave(frequency: number) {
   let accum = 0;
-  const cycle = (Math.PI * 2) / rate;
+  const cycle = (Math.PI * 2) / stream.rate; // Use negotiated rate
   while (true) {
     accum += cycle * frequency;
     yield Math.sin(accum); // Range: -1.0 to +1.0 (full amplitude sine wave)
@@ -90,17 +91,12 @@ const c5 = () => sineWave(523.25);
 const d5 = () => sineWave(587.33);
 const e5 = () => sineWave(659.25);
 
-const aMinor = (duration: number, rate: number) =>
-  clip(duration, rate, mix(a4(), c5(), e5()));
-const aMinorSus = (duration: number, rate: number) =>
-  clip(duration, rate, mix(a4(), d5(), e5()));
+const aMinor = (duration: number) => clip(duration, mix(a4(), c5(), e5()));
+const aMinorSus = (duration: number) => clip(duration, mix(a4(), d5(), e5()));
 
 // Always work with JavaScript Numbers in range -1.0 to +1.0
 // 0.15 = 15% volume to prevent clipping when mixing multiple tones
-const melody = amplify(
-  0.15,
-  concat(aMinor(2, rate), aMinorSus(2, rate), aMinor(4, rate))
-);
+const melody = amplify(0.15, concat(aMinor(2), aMinorSus(2), aMinor(4)));
 
 // Convert mono melody to stereo by duplicating to both channels
 function* monoToStereo(monoSamples: Iterable<number>) {
