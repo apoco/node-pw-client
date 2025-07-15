@@ -1,11 +1,13 @@
-import EventEmitter from "node:events";
-import { AudioFormat, OutputBufferFactory } from "./audio-format.mjs";
+import EventEmitter, { once } from "node:events";
+import { AudioFormat } from "./audio-format.mjs";
+import { AudioQuality, getFormatPreferences } from "./audio-quality.mjs";
 import { NativePipeWireSession } from "./session.mjs";
 import * as Props from "./props.mjs";
 import { Latency, StreamState, streamStateToName } from "./stream.mjs";
+import { adaptSamples } from "./format-negotiation.mjs";
 
 export type NativeAudioOutputStream = {
-  connect: () => Promise<void>;
+  connect: (options?: { preferredFormats?: number[] }) => Promise<void>;
   get bufferSize(): number;
   write: (data: ArrayBuffer) => void;
   isReady: () => Promise<number>;
@@ -15,25 +17,22 @@ export type NativeAudioOutputStream = {
 
 export type AudioOutputStreamOpts = {
   name?: string;
-  format?: AudioFormat;
   rate?: number;
   channels?: number;
-  media?: {
-    type?: "Audio" | "Video" | "Midi";
-    category?: "Playback" | "Capture" | "Duplex" | "Monitor" | "Manager";
-    role?:
-      | "Movie"
-      | "Music"
-      | "Camera"
-      | "Screen"
-      | "Communication"
-      | "Game"
-      | "Notification"
-      | "DSP"
-      | "Production"
-      | "Accessibility"
-      | "Test";
-  };
+  role?:
+    | "Movie"
+    | "Music"
+    | "Camera"
+    | "Screen"
+    | "Communication"
+    | "Game"
+    | "Notification"
+    | "DSP"
+    | "Production"
+    | "Accessibility"
+    | "Test";
+  quality?: AudioQuality;
+  preferredFormats?: AudioFormat[];
 };
 
 export type AudioOutputStreamProps = {
@@ -53,7 +52,7 @@ export type AudioOutputStreamProps = {
 
 type AudioEvents = {
   propsChange: [AudioOutputStreamProps];
-  formatChange: [{ format: number; channels: number; rate: number }];
+  formatChange: [{ format: AudioFormat; channels: number; rate: number }];
   latencyChange: [Latency];
   unknownParamChange: [number];
   stateChange: [StreamState];
@@ -64,6 +63,9 @@ export interface AudioOutputStream extends EventEmitter<AudioEvents> {
   connect: () => Promise<void>;
   write: (samples: Iterable<number>) => Promise<void>;
   isFinished: () => Promise<void>;
+  get format(): AudioFormat;
+  get channels(): number;
+  get rate(): number;
   [Symbol.asyncDispose]: () => Promise<void>;
 }
 
@@ -91,7 +93,14 @@ export class AudioOutputStreamImpl
   }
 
   #nativeStream!: NativeAudioOutputStream;
-  #bufferFactory!: OutputBufferFactory;
+  #connectionConfig!: {
+    quality: AudioQuality;
+    preferredFormats?: AudioFormat[];
+  };
+
+  #negotiatedFormat!: AudioFormat;
+  #negotiatedChannels: number = 2;
+  #negotiatedRate: number = 48_000;
 
   private constructor() {
     super();
@@ -99,33 +108,55 @@ export class AudioOutputStreamImpl
 
   async #init(
     session: NativePipeWireSession,
-    {
+    opts: AudioOutputStreamOpts = {}
+  ) {
+    const {
       name = "PipeWireStream",
-      format = AudioFormat.Float64,
       rate = 48_000,
       channels = 2,
-      media = {},
-    }: AudioOutputStreamOpts = {}
-  ) {
-    const props: Record<string, string> = {};
-    if (media.type) {
-      props[Props.Media.Type] = media.type;
-    }
-    if (media.category) {
-      props[Props.Media.Category] = media.category;
-    }
-    if (media.role) {
-      props[Props.Media.Role] = media.role;
-    }
+      role,
+      quality = AudioQuality.Standard,
+      preferredFormats,
+    } = opts;
 
-    this.#bufferFactory = format.BufferClass;
-    this.#nativeStream = await session.createAudioOutputStream({
+    this.#connectionConfig = { quality, preferredFormats };
+    this.#nativeStream = await this.#createNativeStream(session, {
       name,
-      format: format.enumValue,
-      bytesPerSample: format.byteSize,
       rate,
       channels,
-      props,
+      props: this.#buildMediaProps(role),
+    });
+  }
+
+  #buildMediaProps(role?: string) {
+    const props: Record<string, string> = {
+      [Props.Media.Type]: "Audio",
+      [Props.Media.Category]: "Playback",
+    };
+
+    if (role) {
+      props[Props.Media.Role] = role;
+    }
+
+    return props;
+  }
+
+  async #createNativeStream(
+    session: NativePipeWireSession,
+    config: {
+      name: string;
+      rate: number;
+      channels: number;
+      props: Record<string, string>;
+    }
+  ) {
+    return session.createAudioOutputStream({
+      name: config.name,
+      format: AudioFormat.Float64.enumValue,
+      bytesPerSample: AudioFormat.Float64.byteSize,
+      rate: config.rate,
+      channels: config.channels,
+      props: config.props,
       onStateChange: (state, error) => {
         this.emit("stateChange", streamStateToName[state]);
         if (error) {
@@ -135,43 +166,89 @@ export class AudioOutputStreamImpl
       onLatencyChange: (latency) => this.emit("latencyChange", latency),
       onPropsChange: (props) => this.emit("propsChange", props),
       onUnknownParamChange: (param) => this.emit("unknownParamChange", param),
-      onFormatChange: (format) => {
-        const newFormat = AudioFormat.fromEnum(format.format);
-        if (!newFormat) {
-          throw new Error(`Unknown format: ${format.format}`);
-        }
-        this.#bufferFactory = newFormat.BufferClass;
-        this.emit("formatChange", format);
-      },
+      onFormatChange: (format) => this.#handleFormatChange(format),
     });
   }
 
-  connect() {
-    return this.#nativeStream.connect();
+  #handleFormatChange(format: {
+    format: number;
+    channels: number;
+    rate: number;
+  }) {
+    const newFormat = AudioFormat.fromEnum(format.format);
+    if (!newFormat) {
+      throw new Error(`Unknown format: ${format.format}`);
+    }
+
+    // Update negotiated format info
+    this.#negotiatedFormat = newFormat;
+    this.#negotiatedChannels = format.channels;
+    this.#negotiatedRate = format.rate;
+
+    // Emit format change event with AudioFormat object
+    this.emit("formatChange", {
+      format: newFormat,
+      channels: format.channels,
+      rate: format.rate,
+    });
+  }
+
+  async connect() {
+    const formatNegotiated = once(this, "formatChange");
+
+    const preferredFormats =
+      this.#connectionConfig.preferredFormats ??
+      getFormatPreferences(this.#connectionConfig.quality);
+
+    await this.#nativeStream.connect({
+      preferredFormats: preferredFormats.map((f) => f.enumValue),
+    });
+
+    await formatNegotiated;
   }
 
   async write(samples: Iterable<number>) {
-    let chunkSize = this.#nativeStream.bufferSize;
-    let output = this.#bufferFactory(chunkSize);
+    if (this.#negotiatedFormat !== AudioFormat.Float64) {
+      samples = adaptSamples(samples, this.#negotiatedFormat);
+    }
+
+    // bufferSize now returns available bytes directly
+    let availableBytes = this.#nativeStream.bufferSize;
+    let bytesPerSample = this.#negotiatedFormat.byteSize;
+    let samplesPerChunk = Math.floor(availableBytes / bytesPerSample);
+    let output = this.#negotiatedFormat.BufferClass(samplesPerChunk);
     let offset = 0;
 
     for (const sample of samples) {
-      output.set(offset++, sample);
-      if (offset >= chunkSize) {
-        this.#nativeStream.write(output.buffer);
-        chunkSize = await this.#nativeStream.isReady();
-        output = this.#bufferFactory(chunkSize);
+      if (offset >= samplesPerChunk) {
+        this.#nativeStream.write(output.subarray(0, offset).buffer);
+        availableBytes = await this.#nativeStream.isReady();
+
+        samplesPerChunk = Math.floor(availableBytes / bytesPerSample);
+        output = this.#negotiatedFormat.BufferClass(samplesPerChunk);
         offset = 0;
       }
+
+      output.set(offset++, sample);
     }
 
-    if (offset) {
-      this.#nativeStream.write(output.subarray(0, offset).buffer);
-    }
+    this.#nativeStream.write(output.subarray(0, offset).buffer);
   }
 
   isFinished() {
     return this.#nativeStream.isFinished();
+  }
+
+  get format(): AudioFormat {
+    return this.#negotiatedFormat;
+  }
+
+  get channels(): number {
+    return this.#negotiatedChannels;
+  }
+
+  get rate(): number {
+    return this.#negotiatedRate;
   }
 
   [Symbol.asyncDispose]() {

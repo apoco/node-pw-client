@@ -7,6 +7,9 @@
 #include <spa/param/audio/format-utils.h>
 #include <spa/param/latency-utils.h>
 #include <spa/param/props.h>
+#include <spa/pod/builder.h>
+#include <spa/utils/result.h>
+#include <vector>
 
 #include "audio-output-stream.hpp"
 #include "promises.hpp"
@@ -169,38 +172,95 @@ void AudioOutputStream::initStream(std::string name, pw_properties* properties)
     });
 }
 
+std::vector<spa_audio_format> AudioOutputStream::parsePreferredFormats(const Napi::Object& options)
+{
+    if (!options.Has("preferredFormats") || !options.Get("preferredFormats").IsArray()) {
+        throw std::runtime_error("connect() requires preferredFormats array");
+    }
+
+    std::vector<spa_audio_format> preferredFormats;
+    auto formatsArray = options.Get("preferredFormats").As<Napi::Array>();
+    for (uint32_t i = 0; i < formatsArray.Length(); i++) {
+        auto formatValue = formatsArray.Get(i).As<Napi::Number>().Uint32Value();
+        preferredFormats.push_back((spa_audio_format)formatValue);
+    }
+    return preferredFormats;
+}
+
+void AudioOutputStream::buildFormatParams(struct spa_pod_builder& podBuilder,
+    const std::vector<spa_audio_format>& preferredFormats)
+{
+    struct spa_pod_frame formatFrame;
+    spa_pod_builder_push_object(&podBuilder, &formatFrame, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
+    spa_pod_builder_add(&podBuilder, SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_audio), 0);
+    spa_pod_builder_add(&podBuilder, SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw), 0);
+
+    // Add format choices - always offer multiple formats for best compatibility
+    if (preferredFormats.size() == 1) {
+        spa_pod_builder_add(&podBuilder, SPA_FORMAT_AUDIO_format, SPA_POD_Id(preferredFormats[0]), 0);
+    } else {
+        struct spa_pod_frame choiceFrame;
+        spa_pod_builder_prop(&podBuilder, SPA_FORMAT_AUDIO_format, 0);
+        spa_pod_builder_push_choice(&podBuilder, &choiceFrame, SPA_CHOICE_Enum, 0);
+        spa_pod_builder_id(&podBuilder, preferredFormats[0]); // Default/preferred
+        for (auto fmt : preferredFormats) {
+            spa_pod_builder_id(&podBuilder, fmt);
+        }
+        spa_pod_builder_pop(&podBuilder, &choiceFrame);
+    }
+
+    spa_pod_builder_add(&podBuilder, SPA_FORMAT_AUDIO_rate, SPA_POD_Int(this->rate), 0);
+    spa_pod_builder_add(&podBuilder, SPA_FORMAT_AUDIO_channels, SPA_POD_Int(this->channels), 0);
+    spa_pod_builder_pop(&podBuilder, &formatFrame);
+}
+
+void AudioOutputStream::connectStream(const std::vector<spa_audio_format>& preferredFormats)
+{
+    session->withThreadLock([this, preferredFormats]() {
+        uint8_t buffer[4096]; // Larger buffer for multiple formats
+        struct spa_pod_builder podBuilder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
+
+        buildFormatParams(podBuilder, preferredFormats);
+
+        const struct spa_pod* connectParams[1] = {
+            (struct spa_pod*)buffer
+        };
+
+        pw_stream_connect(
+            stream,
+            PW_DIRECTION_OUTPUT,
+            PW_ID_ANY,
+            (pw_stream_flags)(PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_RT_PROCESS),
+            connectParams,
+            1);
+    });
+}
+
 Napi::Value AudioOutputStream::connect(const Napi::CallbackInfo& info)
 {
     auto env = info.Env();
-    return async(
-        env,
-        [this]() {
-            session->withThreadLock([this]() {
-                uint8_t buffer[1024];
-                struct spa_pod_builder podBuilder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-                struct spa_audio_info_raw audioInfo = {
-                    .format = this->format,
-                    .rate = this->rate,
-                    .channels = this->channels
-                };
-                const struct spa_pod* connectParams[1] = {
-                    spa_format_audio_raw_build(
-                        &podBuilder,
-                        SPA_PARAM_EnumFormat,
-                        &audioInfo)
-                };
-                pw_stream_connect(
-                    stream,
-                    PW_DIRECTION_OUTPUT,
-                    PW_ID_ANY,
-                    (pw_stream_flags)(PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS | PW_STREAM_FLAG_RT_PROCESS),
-                    connectParams,
-                    1);
+
+    if (info.Length() == 0 || !info[0].IsObject()) {
+        Napi::TypeError::New(env, "connect() requires options object with preferredFormats").ThrowAsJavaScriptException();
+    }
+
+    auto options = info[0].As<Napi::Object>();
+
+    try {
+        auto preferredFormats = parsePreferredFormats(options);
+
+        return async(
+            env,
+            [this, preferredFormats]() {
+                connectStream(preferredFormats);
+            },
+            [env]() {
+                return env.Undefined();
             });
-        },
-        [env]() {
-            return env.Undefined();
-        });
+    } catch (const std::exception& e) {
+        Napi::TypeError::New(env, e.what()).ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
 }
 
 pw_stream* AudioOutputStream::getStream()
@@ -225,7 +285,10 @@ uint32_t AudioOutputStream::getBytesPerFrame()
 
 Napi::Value AudioOutputStream::getBufferSize(const Napi::CallbackInfo& info)
 {
-    return Napi::Number::New(info.Env(), this->frameBufferSize);
+    // Return available buffer space in bytes, not frames
+    auto availableFrames = (long)frameBufferSize - queuedFrameCount;
+    auto availableBytes = availableFrames * getBytesPerFrame();
+    return Napi::Number::New(info.Env(), std::max((long)0, availableBytes));
 }
 
 void AudioOutputStream::onStateChange(pw_stream_state state, const char* error)
@@ -390,10 +453,35 @@ void AudioOutputStream::onFormatChange(const spa_pod* param)
     auto newChannels = audioInfo.channels;
     auto newFormat = audioInfo.format;
 
-    if (newRate != rate || newChannels != channels || newFormat != format) {
+    // Calculate bytes per sample for the new format
+    uint32_t newBytesPerSample;
+    switch (newFormat) {
+    case SPA_AUDIO_FORMAT_F64:
+        newBytesPerSample = 8;
+        break;
+    case SPA_AUDIO_FORMAT_F32:
+        newBytesPerSample = 4;
+        break;
+    case SPA_AUDIO_FORMAT_S32:
+    case SPA_AUDIO_FORMAT_U32:
+    case SPA_AUDIO_FORMAT_S24_32:
+        newBytesPerSample = 4;
+        break;
+    case SPA_AUDIO_FORMAT_S16:
+    case SPA_AUDIO_FORMAT_U16:
+        newBytesPerSample = 2;
+        break;
+    default:
+        // Default to 4 bytes for unknown formats
+        newBytesPerSample = 4;
+        break;
+    }
+
+    if (newRate != rate || newChannels != channels || newFormat != format || newBytesPerSample != bytesPerSample) {
         rate = newRate;
         channels = newChannels;
         format = newFormat;
+        bytesPerSample = newBytesPerSample;
 
         formatChangeCallback.NonBlockingCall([this](const Napi::Env env, Napi::Function jsCallback) {
             auto formatObj = Napi::Object::New(env);
@@ -474,27 +562,29 @@ Napi::Value AudioOutputStream::write(const Napi::CallbackInfo& info)
 Napi::Value AudioOutputStream::isReady(const Napi::CallbackInfo& info)
 {
     auto env = info.Env();
-    auto wanted = (long)this->frameBufferSize - this->queuedFrameCount;
-    if (wanted > 0) {
-        return resolved(Napi::Number::New(env, wanted));
+    auto availableFrames = (long)frameBufferSize - queuedFrameCount;
+    auto availableBytes = availableFrames * getBytesPerFrame();
+    if (availableBytes > 0) {
+        return resolved(Napi::Number::New(env, availableBytes));
     }
 
-    if (!this->readyDeferral) {
-        this->readyDeferral = new Napi::Promise::Deferred(env);
-        this->readySignal = Napi::ThreadSafeFunction::New(
+    if (!readyDeferral) {
+        readyDeferral = new Napi::Promise::Deferred(env);
+        readySignal = Napi::ThreadSafeFunction::New(
             env,
             Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 auto env = info.Env();
-                auto wanted = (long)this->frameBufferSize - this->queuedFrameCount;
-                if (wanted > 0) {
-                    this->readyDeferral->Resolve(Napi::Number::New(env, wanted));
-                    this->readyDeferral = NULL;
+                auto availableFrames = (long)frameBufferSize - queuedFrameCount;
+                auto availableBytes = availableFrames * getBytesPerFrame();
+                if (availableBytes > 0) {
+                    readyDeferral->Resolve(Napi::Number::New(env, availableBytes));
+                    readyDeferral = NULL;
                 }
             }),
-            "PipeWireStream::readySignal", 0, 1, this->readyDeferral);
+            "PipeWireStream::readySignal", 0, 1, readyDeferral);
     }
 
-    return this->readyDeferral->Promise();
+    return readyDeferral->Promise();
 }
 
 Napi::Value AudioOutputStream::isFinished(const Napi::CallbackInfo& info)

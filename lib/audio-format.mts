@@ -87,15 +87,18 @@ export class AudioFormat {
   #enumValue: number;
   #byteSize: number;
   #bufferFactory: OutputBufferFactory;
+  #description: string;
 
   constructor(
     value: number,
     byteSize: number,
-    BufferClass: OutputBufferFactory
+    BufferClass: OutputBufferFactory,
+    description: string
   ) {
     this.#enumValue = value;
     this.#byteSize = byteSize;
     this.#bufferFactory = BufferClass;
+    this.#description = description;
     AudioFormat.#enumMap.set(value, this);
   }
 
@@ -111,14 +114,28 @@ export class AudioFormat {
     return this.#bufferFactory;
   }
 
+  get description() {
+    return this.#description;
+  }
+
   static #enumMap = new Map<number, AudioFormat>();
 
   static fromEnum(format: number) {
     return AudioFormat.#enumMap.get(format);
   }
 
-  static Int8 = new AudioFormat(0x101, 1, Int8Buffer);
-  static Uint8 = new AudioFormat(0x102, 1, Uint8Buffer);
+  static Int8 = new AudioFormat(
+    0x101,
+    1,
+    Int8Buffer,
+    "8-bit signed integer (low quality)"
+  );
+  static Uint8 = new AudioFormat(
+    0x102,
+    1,
+    Uint8Buffer,
+    "8-bit unsigned integer (basic quality)"
+  );
 
   static get Int16() {
     return endianness() === "BE" ? AudioFormat.Int16BE : AudioFormat.Int16LE;
@@ -184,31 +201,126 @@ export class AudioFormat {
       : AudioFormat.Float64LE;
   }
 
-  static ULaw = new AudioFormat(0x11f, 1, Int8Buffer);
-  static ALaw = new AudioFormat(0x120, 1, Int8Buffer);
+  static ULaw = new AudioFormat(0x11f, 1, Int8Buffer, "μ-law compressed audio");
+  static ALaw = new AudioFormat(0x120, 1, Int8Buffer, "A-law compressed audio");
 
-  static Uint8Planar = new AudioFormat(0x201, 1, Uint8Buffer);
-  static Int16Planar = new AudioFormat(0x202, 2, Int16Buffer);
-  static Int24_32Planar = new AudioFormat(0x203, 4, Int32Buffer);
-  static Int32Planar = new AudioFormat(0x204, 4, Int32Buffer);
+  static Uint8Planar = new AudioFormat(
+    0x201,
+    1,
+    Uint8Buffer,
+    "8-bit unsigned planar"
+  );
+  static Int16Planar = new AudioFormat(
+    0x202,
+    2,
+    Int16Buffer,
+    "16-bit signed planar"
+  );
+  static Int24_32Planar = new AudioFormat(
+    0x203,
+    4,
+    Int32Buffer,
+    "24-bit in 32-bit planar"
+  );
+  static Int32Planar = new AudioFormat(
+    0x204,
+    4,
+    Int32Buffer,
+    "32-bit signed planar"
+  );
   // static Int24Planar = new AudioFormat(0x205, 3);
-  static Float32Planar = new AudioFormat(0x206, 4, Float32Buffer);
-  static Float64Planar = new AudioFormat(0x207, 8, Float64Buffer);
-  static Int8Planar = new AudioFormat(0x208, 1, Int8Buffer);
+  static Float32Planar = new AudioFormat(
+    0x206,
+    4,
+    Float32Buffer,
+    "32-bit floating point planar"
+  );
+  static Float64Planar = new AudioFormat(
+    0x207,
+    8,
+    Float64Buffer,
+    "64-bit floating point planar"
+  );
+  static Int8Planar = new AudioFormat(
+    0x208,
+    1,
+    Int8Buffer,
+    "8-bit signed planar"
+  );
 
   // Endian-specific
-  private static Int16LE = new AudioFormat(0x103, 2, Int16Buffer);
-  private static Int16BE = new AudioFormat(0x104, 2, Int16Buffer);
-  private static Uint16LE = new AudioFormat(0x105, 2, Uint16Buffer);
-  private static Uint16BE = new AudioFormat(0x106, 2, Uint16Buffer);
-  private static Int24_32LE = new AudioFormat(0x107, 4, Int32Buffer);
-  private static Int24_32BE = new AudioFormat(0x108, 4, Int32Buffer);
-  private static Uint24_32LE = new AudioFormat(0x109, 4, Uint32Buffer);
-  private static Uint24_32BE = new AudioFormat(0x10a, 4, Uint32Buffer);
-  private static Int32LE = new AudioFormat(0x10b, 4, Int32Buffer);
-  private static Int32BE = new AudioFormat(0x10c, 4, Int32Buffer);
-  private static Uint32LE = new AudioFormat(0x10d, 4, Uint32Buffer);
-  private static Uint32BE = new AudioFormat(0x10e, 4, Uint32Buffer);
+  private static Int16LE = new AudioFormat(
+    0x103,
+    2,
+    Int16Buffer,
+    "16-bit signed integer (standard quality)"
+  );
+  private static Int16BE = new AudioFormat(
+    0x104,
+    2,
+    Int16Buffer,
+    "16-bit signed integer (standard quality)"
+  );
+  private static Uint16LE = new AudioFormat(
+    0x105,
+    2,
+    Uint16Buffer,
+    "16-bit unsigned integer (standard quality)"
+  );
+  private static Uint16BE = new AudioFormat(
+    0x106,
+    2,
+    Uint16Buffer,
+    "16-bit unsigned integer (standard quality)"
+  );
+  private static Int24_32LE = new AudioFormat(
+    0x107,
+    4,
+    Int32Buffer,
+    "24-bit in 32-bit container (professional quality)"
+  );
+  private static Int24_32BE = new AudioFormat(
+    0x108,
+    4,
+    Int32Buffer,
+    "24-bit in 32-bit container (professional quality)"
+  );
+  private static Uint24_32LE = new AudioFormat(
+    0x109,
+    4,
+    Uint32Buffer,
+    "24-bit unsigned in 32-bit container (professional quality)"
+  );
+  private static Uint24_32BE = new AudioFormat(
+    0x10a,
+    4,
+    Uint32Buffer,
+    "24-bit unsigned in 32-bit container (professional quality)"
+  );
+  private static Int32LE = new AudioFormat(
+    0x10b,
+    4,
+    Int32Buffer,
+    "32-bit signed integer (high precision)"
+  );
+  private static Int32BE = new AudioFormat(
+    0x10c,
+    4,
+    Int32Buffer,
+    "32-bit signed integer (high precision)"
+  );
+  private static Uint32LE = new AudioFormat(
+    0x10d,
+    4,
+    Uint32Buffer,
+    "32-bit unsigned integer (high precision)"
+  );
+  private static Uint32BE = new AudioFormat(
+    0x10e,
+    4,
+    Uint32Buffer,
+    "32-bit unsigned integer (high precision)"
+  );
   // private static Int24LE = new AudioFormat(0x10f, 3);
   // private static Int24BE = new AudioFormat(0x110, 3);
   // private static Uint24LE = new AudioFormat(0x111, 3);
@@ -221,8 +333,28 @@ export class AudioFormat {
   // private static Int18BE = new AudioFormat(0x118, 3); // No idea...
   // private static Uint18LE = new AudioFormat(0x119, 3); // No idea...
   // private static Uint18BE = new AudioFormat(0x11a, 3); // No idea...
-  private static Float32LE = new AudioFormat(0x11b, 4, Float32Buffer);
-  private static Float32BE = new AudioFormat(0x11c, 4, Float32Buffer);
-  private static Float64LE = new AudioFormat(0x11d, 8, Float64Buffer);
-  private static Float64BE = new AudioFormat(0x11e, 8, Float64Buffer);
+  private static Float32LE = new AudioFormat(
+    0x11b,
+    4,
+    Float32Buffer,
+    "32-bit floating point (excellent quality)"
+  );
+  private static Float32BE = new AudioFormat(
+    0x11c,
+    4,
+    Float32Buffer,
+    "32-bit floating point (excellent quality)"
+  );
+  private static Float64LE = new AudioFormat(
+    0x11d,
+    8,
+    Float64Buffer,
+    "64-bit floating point (highest precision)"
+  );
+  private static Float64BE = new AudioFormat(
+    0x11e,
+    8,
+    Float64Buffer,
+    "64-bit floating point (highest precision)"
+  );
 }

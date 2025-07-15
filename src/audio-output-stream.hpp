@@ -7,6 +7,7 @@
 #include <queue>
 #include <spa/param/audio/raw.h>
 #include <spa/param/latency.h>
+#include <vector>
 
 #include "session.hpp"
 
@@ -81,6 +82,12 @@ private:
     void setProps(Napi::Env env, const spa_pod_object* properties);
     void setProp(const char* key, spa_pod* value);
     void setChannelProp(uint32_t channel, const char* key, Napi::Value value);
+
+    // Helper methods for connect()
+    std::vector<spa_audio_format> parsePreferredFormats(const Napi::Object& options);
+    void buildFormatParams(struct spa_pod_builder& podBuilder,
+        const std::vector<spa_audio_format>& preferredFormats);
+    void connectStream(const std::vector<spa_audio_format>& preferredFormats);
 
     void _destroy();
 };

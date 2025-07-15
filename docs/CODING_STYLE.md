@@ -12,6 +12,30 @@ This file documents Jacob's coding preferences, standards, and conventions for t
 - **Resource safety** - Use RAII in C++, automatic cleanup in JS
 - **Functional patterns** - Prefer immutability and pure functions where possible
 
+### Function Length & Organization
+
+- **~40 line limit** - Functions should generally stay under 40 lines for readability
+- **Extract helper functions** - Break down long functions to show the general outline without scrolling
+- **Self-documenting structure** - The main function should read like a high-level summary of what it does
+- **Single responsibility** - Each function should have one clear purpose
+
+```typescript
+// ✅ Well-structured function showing outline clearly
+async function processAudioStream(stream: AudioStream): Promise<void> {
+  await validateStreamFormat(stream);
+  const processor = createAudioProcessor(stream.format);
+  const samples = await readAudioSamples(stream);
+  const processed = await applyAudioProcessing(processor, samples);
+  await writeProcessedAudio(stream, processed);
+}
+
+// ❌ Avoid monolithic functions that require scrolling
+async function processAudioStream(stream: AudioStream): Promise<void> {
+  // 50+ lines of validation, processing, and writing all mixed together
+  // Hard to see the overall flow without scrolling
+}
+```
+
 ### Error Handling Philosophy
 
 - **Fail fast** - Don't continue with invalid state
@@ -293,6 +317,31 @@ npx tsc --noEmit
 - **Semicolons** in TypeScript
 
 ### Comments
+
+#### Comment Audience
+
+- **Write for future users**, not the current developer
+- **Avoid references to "old" vs "new" APIs** - users only see the current API
+- **Don't use terms like "simplified"** unless genuinely comparing alternatives
+- **Explain concepts and patterns** that help users understand the library
+
+```typescript
+// ✅ Good - explains the concept to new users
+// Choose your quality level based on your application needs
+quality: AudioQuality.High, // Best for music production
+
+// ❌ Avoid - assumes knowledge of previous versions
+quality: AudioQuality.High, // Simplified API - no need for technical formats!
+
+// ✅ Good - explains why this matters
+// Use stereo so mono content plays in both ears
+channels: 2,
+
+// ❌ Avoid - references internal development process
+// Use stereo so mono content plays in both ears (was mono before)
+```
+
+#### Technical Comments
 
 ```typescript
 // ✅ Explain why, not what
