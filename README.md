@@ -104,7 +104,7 @@ npx tsx examples/hello-pipewire.mts
 
 1. Read [Contributing Guidelines](docs/explanation/contributing.md)
 2. Check [Architecture Overview](docs/explanation/architecture.md)
-3. Follow [Coding Style](docs/explanation/coding-style.md)
+3. Follow [Coding Style](docs/explanation/coding-standards.md)
 4. Run examples to test changes
 
 ## 📄 License

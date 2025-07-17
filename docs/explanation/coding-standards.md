@@ -1,13 +1,13 @@
 # Developer Preferences & Coding Standards
 
-This file documents Jacob's coding preferences, standards, and conventions for this project.
+This file documents my coding preferences, standards, and conventions for this project.
 
 ## 🎯 General Development Philosophy
 
 ### Code Quality Principles
 
 - **Clarity over cleverness** - Code should be self-documenting
-- **Performance matters** - This is real-time audio, optimize critical paths
+- **Performance matters** - This is real-time audio; optimize critical paths
 - **Type safety** - Leverage TypeScript's type system fully
 - **Resource safety** - Use RAII in C++, automatic cleanup in JS
 - **Functional patterns** - Prefer immutability and pure functions where possible
@@ -19,22 +19,10 @@ This file documents Jacob's coding preferences, standards, and conventions for t
 - **Self-documenting structure** - The main function should read like a high-level summary of what it does
 - **Single responsibility** - Each function should have one clear purpose
 
-```typescript
-// ✅ Well-structured function showing outline clearly
-async function processAudioStream(stream: AudioStream): Promise<void> {
-  await validateStreamFormat(stream);
-  const processor = createAudioProcessor(stream.format);
-  const samples = await readAudioSamples(stream);
-  const processed = await applyAudioProcessing(processor, samples);
-  await writeProcessedAudio(stream, processed);
-}
+### API Design
 
-// ❌ Avoid monolithic functions that require scrolling
-async function processAudioStream(stream: AudioStream): Promise<void> {
-  // 50+ lines of validation, processing, and writing all mixed together
-  // Hard to see the overall flow without scrolling
-}
-```
+- **Minimize surface area**; only export what users need
+- **Minimize concepts**; the fewer things the user needs to know about, the better
 
 ### Error Handling Philosophy
 
@@ -99,10 +87,10 @@ try {
 }
 ```
 
-#### Generator Functions for Audio
+#### Lazy Iterables for Audio
 
 ```typescript
-// ✅ Prefer generators for audio processing
+// ✅ Prefer lazy iterables like generators for audio processing
 function* amplify(volume: number, samples: Iterable<number>) {
   for (const sample of samples) {
     yield sample * volume;
@@ -111,7 +99,7 @@ function* amplify(volume: number, samples: Iterable<number>) {
 
 // ✅ Composable audio processing
 function* audioChain(input: Iterable<number>) {
-  yield* amplify(0.5, yield* filter(lowPass(1000), yield* input));
+  yield* amplify(0.5, filter(lowPass(1000), input));
 }
 ```
 
@@ -225,13 +213,17 @@ lib/               # TypeScript API layer
 ├── audio-*.mts    # Stream classes
 └── types.mts      # Type definitions
 
+test/              # For tests (TBD)
+
 examples/          # Usage examples
 ├── basic-*.mts    # Simple examples
 └── advanced-*.mts # Complex examples
 
-docs/              # Documentation
+docs/              # Documentation, follows the [Diátaxis framework](https://diataxis.fr/)
 ├── api/           # API reference
-└── guides/        # Tutorials and guides
+├── explanation/   # Documents concepts, how things work, etc.
+├── how-to-guides/ # Task-oriented guides
+└── tutorials/     # Progressive step-by-step instructions for guided learning
 ```
 
 ### Naming Conventions
@@ -248,7 +240,7 @@ docs/              # Documentation
 
 - **Classes:** PascalCase (`AudioOutputStream`)
 - **Methods:** camelCase (`connectStream`)
-- **Members:** snake*case with trailing underscore (`stream*`, `loop\_`)
+- **Members:** snake-case (`stream`, `main_loop`)
 - **Constants:** SCREAMING_SNAKE_CASE (`DEFAULT_BUFFER_SIZE`)
 
 ## 🧪 Testing Preferences
@@ -313,35 +305,20 @@ npx tsc --noEmit
 - **Prettier** for TypeScript/JavaScript
 - **Consistent indentation** (2 spaces for TS, 4 for C++)
 - **No trailing whitespace**
-- **Single quotes** in TypeScript
-- **Semicolons** in TypeScript
 
 ### Comments
 
-#### Comment Audience
+#### For end-users
 
-- **Write for future users**, not the current developer
-- **Avoid references to "old" vs "new" APIs** - users only see the current API
-- **Don't use terms like "simplified"** unless genuinely comparing alternatives
-- **Explain concepts and patterns** that help users understand the library
+- **JSDocs for the public interface**; if it's not public don't bother with jsdocs.
+- **Keep it succinct**; link to documentation files for long-form explanations
 
-```typescript
-// ✅ Good - explains the concept to new users
-// Choose your quality level based on your application needs
-quality: AudioQuality.High, // Best for music production
+#### For code maintainers
 
-// ❌ Avoid - assumes knowledge of previous versions
-quality: AudioQuality.High, // Simplified API - no need for technical formats!
-
-// ✅ Good - explains why this matters
-// Use stereo so mono content plays in both ears
-channels: 2,
-
-// ❌ Avoid - references internal development process
-// Use stereo so mono content plays in both ears (was mono before)
-```
-
-#### Technical Comments
+- **Use comments sparingly**; code should be self-explanatory.
+- **Write for future users**, not the current developer.
+- **Avoid references to "old" vs "new" APIs**; users only see the current API.
+- **Don't duplicate documentation**; link to it instead.
 
 ```typescript
 // ✅ Explain why, not what
@@ -368,15 +345,9 @@ function* lowPassFilter(
 
 - **Minimize allocations** in audio callback paths
 - **Prefer stack allocation** over heap in C++
-- **Use appropriate audio formats** (Float32 for most cases, Float64 for precision)
-- **Profile regularly** with real-world examples
 
 ### JavaScript ↔ C++ Interface
 
 - **Batch operations** to reduce crossing overhead
 - **Use TypedArrays** for bulk data transfer
 - **Minimize object creation** in hot paths
-
----
-
-**Note:** These preferences should be followed for consistency, but can be discussed and evolved as the project grows.
