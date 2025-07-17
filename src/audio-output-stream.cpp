@@ -52,6 +52,9 @@ Napi::Function AudioOutputStream::init(Napi::Env env)
             InstanceMethod<&AudioOutputStream::connect>(
                 "connect",
                 napi_enumerable),
+            InstanceMethod<&AudioOutputStream::disconnect>(
+                "disconnect",
+                napi_enumerable),
             InstanceAccessor(
                 "bufferSize",
                 &AudioOutputStream::getBufferSize,
@@ -94,6 +97,7 @@ AudioOutputStream::AudioOutputStream(const Napi::CallbackInfo& info)
     , propsCallback(NULL)
     , readyDeferral(NULL)
     , finishedDeferral(NULL)
+    , disconnectDeferral(NULL)
 {
     Napi::Env env = info.Env();
     if (!info.IsConstructCall()) {
@@ -279,6 +283,51 @@ Napi::Value AudioOutputStream::connect(const Napi::CallbackInfo& info)
     }
 }
 
+Napi::Value AudioOutputStream::disconnect(const Napi::CallbackInfo& info)
+{
+    auto env = info.Env();
+
+    // Check current state first - if already disconnected, return immediately
+    auto currentState = pw_stream_get_state(stream, nullptr);
+    if (currentState == PW_STREAM_STATE_UNCONNECTED) {
+        return resolved(env.Undefined());
+    }
+
+    // Create the disconnect promise on the main thread
+    if (!disconnectDeferral) {
+        disconnectDeferral = new Napi::Promise::Deferred(env);
+        disconnectSignal = Napi::ThreadSafeFunction::New(
+            env,
+            Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
+                auto env = info.Env();
+                if (disconnectDeferral) {
+                    disconnectDeferral->Resolve(env.Undefined());
+                    delete disconnectDeferral;
+                    disconnectDeferral = NULL;
+                }
+            }),
+            "PipeWireStream::disconnectSignal", 0, 1, disconnectDeferral);
+    }
+
+    return async(
+        env,
+        [this]() {
+            session->withThreadLock([this]() {
+                if (stream) {
+                    auto state = pw_stream_get_state(stream, nullptr);
+                    if (state == PW_STREAM_STATE_STREAMING || state == PW_STREAM_STATE_PAUSED || state == PW_STREAM_STATE_CONNECTING) {
+                        pw_stream_disconnect(stream);
+                    }
+                }
+            });
+        },
+        [this, env]() {
+            return disconnectDeferral
+                ? disconnectDeferral->Promise()
+                : resolved(env.Undefined());
+        });
+}
+
 pw_stream* AudioOutputStream::getStream()
 {
     return stream;
@@ -301,7 +350,6 @@ uint32_t AudioOutputStream::getBytesPerFrame()
 
 Napi::Value AudioOutputStream::getBufferSize(const Napi::CallbackInfo& info)
 {
-    // Return available buffer space in bytes, not frames
     auto availableFrames = (long)frameBufferSize - queuedFrameCount;
     auto availableBytes = availableFrames * getBytesPerFrame();
     return Napi::Number::New(info.Env(), std::max((long)0, availableBytes));
@@ -310,6 +358,14 @@ Napi::Value AudioOutputStream::getBufferSize(const Napi::CallbackInfo& info)
 void AudioOutputStream::onStateChange(pw_stream_state state, const char* error)
 {
     std::string errorMessage = error ? error : "";
+
+    // Check if we're waiting for a disconnect and the stream is now unconnected
+    if (state == PW_STREAM_STATE_UNCONNECTED && disconnectDeferral) {
+        disconnectSignal.NonBlockingCall();
+        disconnectSignal.Release();
+        disconnectSignal = nullptr;
+    }
+
     stateChangedCallback.NonBlockingCall(
         [state, errorMessage](const Napi::Env env, Napi::Function jsCallback) {
             auto jsState = Napi::Number::New(env, (int)state);
@@ -379,7 +435,7 @@ Napi::Value podToJsValue(const Napi::Env env, const struct spa_pod* pod)
         return Napi::String::New(env, str);
     } else {
         // Handle other types as needed
-        printf("Unhandled POD type %d\n", pod->type);
+        // Unhandled POD type - silently ignore
         return env.Undefined();
     }
 }
@@ -454,7 +510,7 @@ void AudioOutputStream::setProps(Napi::Env env, const spa_pod_object* properties
             props.Set("params", paramsObj);
         } break;
         default:
-            printf("Unhandled prop %d\n", key);
+            // Unhandled prop - silently ignore
             break;
         }
     }
@@ -580,11 +636,18 @@ Napi::Value AudioOutputStream::isReady(const Napi::CallbackInfo& info)
     auto env = info.Env();
     auto availableFrames = (long)frameBufferSize - queuedFrameCount;
     auto availableBytes = availableFrames * getBytesPerFrame();
+
     if (availableBytes > 0) {
         return resolved(Napi::Number::New(env, availableBytes));
     }
 
     if (!readyDeferral) {
+        // Release any existing readySignal before creating a new one
+        if (readySignal) {
+            readySignal.Release();
+            readySignal = nullptr;
+        }
+
         readyDeferral = new Napi::Promise::Deferred(env);
         readySignal = Napi::ThreadSafeFunction::New(
             env,
@@ -594,6 +657,7 @@ Napi::Value AudioOutputStream::isReady(const Napi::CallbackInfo& info)
                 auto availableBytes = availableFrames * getBytesPerFrame();
                 if (availableBytes > 0) {
                     readyDeferral->Resolve(Napi::Number::New(env, availableBytes));
+                    delete readyDeferral;
                     readyDeferral = NULL;
                 }
             }),
@@ -617,6 +681,7 @@ Napi::Value AudioOutputStream::isFinished(const Napi::CallbackInfo& info)
             Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 auto env = info.Env();
                 this->finishedDeferral->Resolve(env.Undefined());
+                delete this->finishedDeferral;
                 this->finishedDeferral = NULL;
             }),
             "PipeWireStream::finishedSignal", 0, 1, this->finishedDeferral);
@@ -659,12 +724,12 @@ void AudioOutputStream::fillBuffer(uint8_t* destBuffer, uint size)
 
     if (queuedFrameCount < frameBufferSize && readyDeferral) {
         this->readySignal.NonBlockingCall();
-        this->readySignal.Release();
+        // Don't release here - let _destroy() handle it to avoid double-free
     }
 
     if (!totalWritten && finishedDeferral) {
         this->finishedSignal.NonBlockingCall();
-        this->finishedSignal.Release();
+        // Don't release here - let _destroy() handle it to avoid double-free
     }
 }
 
@@ -672,38 +737,101 @@ Napi::Value AudioOutputStream::destroy(const Napi::CallbackInfo& info)
 {
     auto env = info.Env();
 
+    // Reject any pending promises first
     if (this->readyDeferral) {
         this->readyDeferral->Reject(Napi::Error::New(env, "Stream destroyed").Value());
+        delete this->readyDeferral;
         this->readyDeferral = NULL;
     }
 
     if (this->finishedDeferral) {
         this->finishedDeferral->Reject(Napi::Error::New(env, "Stream destroyed").Value());
+        delete this->finishedDeferral;
         this->finishedDeferral = NULL;
+    }
+
+    if (this->disconnectDeferral) {
+        this->disconnectDeferral->Reject(Napi::Error::New(env, "Stream destroyed").Value());
+        delete this->disconnectDeferral;
+        this->disconnectDeferral = NULL;
+    }
+
+    // Unref the props object
+    if (props) {
+        props.Unref();
     }
 
     return async(
         env,
-        [this]() { _destroy(); },
-        [this, env]() {
-            stateChangedCallback.Release();
-            paramChangedCallback.Release();
-            propsCallback.Release();
-            latencyCallback.Release();
-            formatChangeCallback.Release();
-            props.Unref();
+        [this]() {
+            session->withThreadLock([this]() {
+                if (stream) {
+                    auto state = pw_stream_get_state(stream, nullptr);
+                    // Only disconnect if not already unconnected
+                    if (state != PW_STREAM_STATE_UNCONNECTED && state != PW_STREAM_STATE_ERROR) {
+                        pw_stream_disconnect(stream);
+                    }
+                }
+            });
+            _destroy(); // This now handles callback cleanup too
+        },
+        [env]() {
             return env.Undefined();
         });
 }
 
 void AudioOutputStream::_destroy()
 {
-    session->withThreadLock([this]() {
-        if (stream) {
-            pw_stream_destroy(stream);
-            stream = NULL;
-        }
-    });
+    if (destroyed) {
+        return; // Already destroyed
+    }
+    destroyed = true;
+    // Release all ThreadSafeFunction callbacks to prevent hanging
+    if (stateChangedCallback) {
+        stateChangedCallback.Release();
+        stateChangedCallback = nullptr;
+    }
+    if (paramChangedCallback) {
+        paramChangedCallback.Release();
+        paramChangedCallback = nullptr;
+    }
+    if (propsCallback) {
+        propsCallback.Release();
+        propsCallback = nullptr;
+    }
+    if (latencyCallback) {
+        latencyCallback.Release();
+        latencyCallback = nullptr;
+    }
+    if (formatChangeCallback) {
+        formatChangeCallback.Release();
+        formatChangeCallback = nullptr;
+    }
+    if (readySignal) {
+        readySignal.Release();
+        readySignal = nullptr;
+    }
+    if (finishedSignal) {
+        finishedSignal.Release();
+        finishedSignal = nullptr;
+    }
+    if (disconnectSignal) {
+        disconnectSignal.Release();
+        disconnectSignal = nullptr;
+    }
+
+    if (session) {
+        session->withThreadLock([this]() {
+            if (stream) {
+                pw_stream_destroy(stream);
+                stream = NULL;
+            }
+        });
+    } else if (stream) {
+        // Session is null but stream still exists - clean up directly
+        pw_stream_destroy(stream);
+        stream = NULL;
+    }
 }
 
 AudioOutputStream::~AudioOutputStream()

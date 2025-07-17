@@ -59,11 +59,20 @@ export class PipeWireSession {
   createAudioOutputStream(
     opts?: AudioOutputStreamOpts
   ): Promise<AudioOutputStream> {
+    if (!this.#nativeSession) {
+      throw new Error("Session has been disposed");
+    }
     return AudioOutputStreamImpl.create(this.#nativeSession, opts);
   }
 
+  async dispose() {
+    if (this.#nativeSession) {
+      await this.#nativeSession.destroy();
+    }
+  }
+
   [Symbol.asyncDispose]() {
-    return this.#nativeSession.destroy();
+    return this.dispose();
   }
 }
 

@@ -6,7 +6,7 @@ import {
 
 export type OutputBufferFactory = (numSamples: number) => OutputBuffer;
 
-interface OutputBuffer {
+export interface OutputBuffer {
   get buffer(): ArrayBuffer;
   set(index: number, signedFloat: number): void;
   subarray(index: number, sampleCount: number): OutputBuffer;

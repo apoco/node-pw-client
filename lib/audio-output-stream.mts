@@ -1,5 +1,5 @@
 import EventEmitter, { once } from "node:events";
-import { AudioFormat } from "./audio-format.mjs";
+import { AudioFormat, OutputBuffer } from "./audio-format.mjs";
 import {
   AudioQuality,
   getFormatPreferences,
@@ -15,6 +15,7 @@ export type NativeAudioOutputStream = {
     preferredFormats?: number[];
     preferredRates?: number[];
   }) => Promise<void>;
+  disconnect: () => Promise<void>;
   get bufferSize(): number;
   write: (data: ArrayBuffer) => void;
   isReady: () => Promise<number>;
@@ -41,6 +42,7 @@ export type AudioOutputStreamOpts = {
   quality?: AudioQuality;
   preferredFormats?: AudioFormat[];
   preferredRates?: number[];
+  autoConnect?: boolean;
 };
 
 export type AudioOutputStreamProps = {
@@ -69,11 +71,14 @@ type AudioEvents = {
 
 export interface AudioOutputStream extends EventEmitter<AudioEvents> {
   connect: () => Promise<void>;
+  disconnect: () => Promise<void>;
   write: (samples: Iterable<number>) => Promise<void>;
   isFinished: () => Promise<void>;
+  dispose: () => Promise<void>;
   get format(): AudioFormat;
   get channels(): number;
   get rate(): number;
+  get isConnected(): boolean;
   [Symbol.asyncDispose]: () => Promise<void>;
 }
 
@@ -106,6 +111,9 @@ export class AudioOutputStreamImpl
     preferredFormats?: AudioFormat[];
     preferredRates?: number[];
   };
+  #isConnected: boolean = false;
+  #autoConnect: boolean = false;
+  #formatNegotiated: boolean = false;
 
   #negotiatedFormat!: AudioFormat;
   #negotiatedChannels: number = 2;
@@ -127,8 +135,10 @@ export class AudioOutputStreamImpl
       quality = AudioQuality.Standard,
       preferredFormats,
       preferredRates,
+      autoConnect = false,
     } = opts;
 
+    this.#autoConnect = autoConnect;
     this.#connectionConfig = { quality, preferredFormats, preferredRates };
     this.#nativeStream = await this.#createNativeStream(session, {
       name,
@@ -204,7 +214,9 @@ export class AudioOutputStreamImpl
   }
 
   async connect() {
-    const formatNegotiated = once(this, "formatChange");
+    if (this.#isConnected) {
+      return; // Already connected
+    }
 
     const preferredFormats =
       this.#connectionConfig.preferredFormats ??
@@ -214,40 +226,72 @@ export class AudioOutputStreamImpl
       this.#connectionConfig.preferredRates ??
       getRatePreferences(this.#connectionConfig.quality);
 
+    // If format already negotiated, we can reuse it
+    const formatNegotiation =
+      !this.#negotiatedFormat && once(this, "formatChange");
+
     await this.#nativeStream.connect({
       preferredFormats: preferredFormats.map((f) => f.enumValue),
       preferredRates,
     });
 
-    await formatNegotiated;
+    await formatNegotiation;
+    this.#formatNegotiated = true;
+    this.#isConnected = true;
+  }
+
+  async disconnect() {
+    if (!this.#isConnected) {
+      return; // Already disconnected
+    }
+
+    await this.#nativeStream.disconnect();
+    this.#isConnected = false;
+  }
+
+  get isConnected(): boolean {
+    return this.#isConnected;
   }
 
   async write(samples: Iterable<number>) {
+    if (!this.#isConnected && this.#autoConnect) {
+      await this.connect();
+    }
+
+    // Check if connected
+    if (!this.#isConnected) {
+      throw new Error(
+        "Stream must be connected before writing audio data. Call await stream.connect() first."
+      );
+    }
+
     if (this.#negotiatedFormat !== AudioFormat.Float64) {
       samples = adaptSamples(samples, this.#negotiatedFormat);
     }
 
-    // bufferSize now returns available bytes directly
-    let availableBytes = this.#nativeStream.bufferSize;
-    let bytesPerSample = this.#negotiatedFormat.byteSize;
-    let samplesPerChunk = Math.floor(availableBytes / bytesPerSample);
-    let output = this.#negotiatedFormat.BufferClass(samplesPerChunk);
+    const bytesPerSample = this.#negotiatedFormat.byteSize;
+    let availableBytes = 0;
+    let numChunks = 0;
     let offset = 0;
+    let output: OutputBuffer | null = null;
 
     for (const sample of samples) {
-      if (offset >= samplesPerChunk) {
+      if (offset >= numChunks && output) {
         this.#nativeStream.write(output.subarray(0, offset).buffer);
-        availableBytes = await this.#nativeStream.isReady();
+        output = null;
+      }
 
-        samplesPerChunk = Math.floor(availableBytes / bytesPerSample);
-        output = this.#negotiatedFormat.BufferClass(samplesPerChunk);
+      if (!output) {
+        availableBytes = await this.#nativeStream.isReady();
+        numChunks = Math.floor(availableBytes / bytesPerSample);
+        output = this.#negotiatedFormat.BufferClass(numChunks);
         offset = 0;
       }
 
       output.set(offset++, sample);
     }
 
-    this.#nativeStream.write(output.subarray(0, offset).buffer);
+    output && this.#nativeStream.write(output.subarray(0, offset).buffer);
   }
 
   isFinished() {
@@ -266,7 +310,12 @@ export class AudioOutputStreamImpl
     return this.#negotiatedRate;
   }
 
+  async dispose() {
+    await this.#nativeStream.destroy();
+    this.#isConnected = false;
+  }
+
   [Symbol.asyncDispose]() {
-    return this.#nativeStream.destroy();
+    return this.dispose();
   }
 }

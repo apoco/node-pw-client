@@ -27,6 +27,7 @@ public:
 
     // JS-callable
     Napi::Value connect(const Napi::CallbackInfo& info);
+    Napi::Value disconnect(const Napi::CallbackInfo& info);
     Napi::Value getBufferSize(const Napi::CallbackInfo& info);
     Napi::Value isReady(const Napi::CallbackInfo& info);
     Napi::Value isFinished(const Napi::CallbackInfo& info);
@@ -75,6 +76,11 @@ private:
 
     Napi::Promise::Deferred* finishedDeferral;
     Napi::ThreadSafeFunction finishedSignal;
+
+    Napi::Promise::Deferred* disconnectDeferral;
+    Napi::ThreadSafeFunction disconnectSignal;
+
+    bool destroyed = false;
 
     void initCallbacks(const Napi::Object& options);
     void initStream(std::string name, pw_properties* properties);

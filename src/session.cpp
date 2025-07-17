@@ -1,6 +1,7 @@
 #include <iostream>
 #include <napi.h>
 #include <pipewire/keys.h>
+#include <pipewire/pipewire.h>
 
 #include "audio-output-stream.hpp"
 #include "promises.hpp"
@@ -43,9 +44,20 @@ PipeWireSession::PipeWireSession(const Napi::CallbackInfo& info)
 
 PipeWireSession::~PipeWireSession()
 {
-    pw_core_disconnect(core);
-    pw_context_destroy(context);
-    pw_thread_loop_destroy(loop);
+    // Only clean up if destroy() wasn't called (resources should already be null)
+    if (!isStopping && loop) {
+        pw_thread_loop_stop(loop);
+    }
+
+    if (core) {
+        pw_core_disconnect(core);
+    }
+    if (context) {
+        pw_context_destroy(context);
+    }
+    if (loop) {
+        pw_thread_loop_destroy(loop);
+    }
 }
 
 pw_loop* PipeWireSession::getLoop()
@@ -63,22 +75,22 @@ void PipeWireSession::withThreadLock(std::function<void()> fn)
 Napi::Value PipeWireSession::start(const Napi::CallbackInfo& info)
 {
     auto env = info.Env();
-    Ref();
+    Ref(); // Keep object alive during async operation
 
     return async(
         env,
         [this]() {
             spa_dict threadProps = {};
             loop = pw_thread_loop_new("PipeWireSession", &threadProps);
+
             withThreadLock([this]() {
                 pw_thread_loop_start(loop);
                 context = pw_context_new(pw_thread_loop_get_loop(loop), NULL, 0);
                 core = pw_context_connect(context, NULL, 0);
             });
         },
-        [this]() {
-            Unref();
-            return Value();
+        [this, env]() {
+            return env.Undefined();
         });
 }
 
@@ -101,7 +113,32 @@ Napi::Value PipeWireSession::destroy(const Napi::CallbackInfo& info)
     }
 
     isStopping = true;
-    return async(env, [this]() {
-        pw_thread_loop_stop(loop);
+
+    return async(env, [this, env]() {
+        // Clean up PipeWire resources in correct order with thread lock
+        if (loop) {
+            withThreadLock([this]() {
+                // 1. Disconnect the core interface first
+                if (core) {
+                    pw_core_disconnect(core);
+                    core = NULL;
+                }
+
+                // 2. Destroy the context
+                if (context) {
+                    pw_context_destroy(context);
+                    context = NULL;
+                }
+            });
+
+            // 3. Stop and destroy the thread loop (outside the lock)
+            pw_thread_loop_stop(loop);
+            pw_thread_loop_destroy(loop);
+            loop = NULL;
+        }
+
+        // Success callback - unref to allow garbage collection and return undefined
+        this->Unref();
+        return env.Undefined(); // Return proper undefined value
     });
 }

@@ -10,7 +10,10 @@
   "author": "Jacob Page <jacob.h.page@gmail.com>",
   "license": "MIT",
   "type": "module",
-  "main": "./dist/index.mjs",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "module": "./dist/index.mjs",
   "devDependencies": {
     "@tsconfig/node22": "^22.0.1",
     "@types/node": "^22.16.3",

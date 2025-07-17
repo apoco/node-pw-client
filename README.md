@@ -1,167 +1,116 @@
-# PipeWire Client for Node.js
+# PipeWire Node.js Client
 
-A high-performance Node.js wrapper for developing PipeWire audio clients, providing a modern TypeScript/JavaScript API for audio streaming and processing on Linux systems.
+Node.js library for PipeWire audio programming. Build audio applications, synthesizers, and streaming solutions using modern JavaScript patterns.
 
-## 🎵 What is this project?
+## ✨ Why This Library?
 
-This project is a native Node.js addon that bridges the gap between JavaScript/TypeScript applications and the [PipeWire](https://pipewire.org/) multimedia framework. It allows developers to create audio applications, synthesizers, audio processors, and streaming solutions using familiar JavaScript patterns while leveraging the low-latency, professional-grade capabilities of PipeWire.
-
-**Key Features:**
-
-- 🚀 **Low-latency audio streaming** - Direct PipeWire integration for professional audio applications
-- 📦 **Quality-Based API** - Choose `High`, `Standard`, or `Efficient` quality levels
-- 🔄 **Real-time audio processing** - Stream audio samples with generator functions and iterators
-- 🎛️ **Automatic format negotiation** - Works with JavaScript Numbers (Float64) and converts optimally
-- 🔧 **Flexible configuration** - Control sample rates, channels, media properties, and more
-- 🗑️ **Resource management** - Automatic cleanup with `using` declarations and Symbol.asyncDispose
+- **🚀 Real-Time Performance** - Native C++ core optimized for low-latency audio
+- **🎵 JavaScript-Friendly** - Develop using idiomatic JavaScript
+- **🔧 Modern Patterns** - ES modules, iterators, explicit resource managment with `using`, built with TypeScript
+- **🎛️ PipeWire Native** - Direct integration with Linux's professional audio system
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- Linux system with PipeWire installed
-- Node.js 22+ (ESM modules required)
-- Build tools: `gcc`, `make`, `python3`
-- PipeWire development headers: `libpipewire-0.3-dev`
-
-### Installation
-
 ```bash
-git clone <repository-url>
-cd node-pw-client
-npm install
-npm run build
+npm install pw-client
 ```
 
-### Basic Usage
-
 ```typescript
-import { startSession, AudioQuality } from "@jacobsoft/pipewire";
+import { startSession, AudioQuality } from "pw-client";
 
-// Create a PipeWire session with automatic cleanup
-await using session = await startSession();
+// Create processing thread for PipeWire
+const session = await startSession();
 
-// Create an audio output stream - simple quality-based API!
-await using stream = await session.createAudioOutputStream({
-  name: "My Audio App",
-  quality: AudioQuality.Standard, // 🎯 Auto-negotiates format AND rate!
-  channels: 2, // Stereo for proper playback
-});
+try {
+  // Create audio stream
+  const stream = await session.createAudioOutputStream({
+    name: "My Audio App",
+    quality: AudioQuality.Standard, // Auto-negotiates optimal format
+    channels: 2, // Stereo output
+  });
 
-await stream.connect();
+  try {
+    await stream.connect();
 
-// Use the negotiated values - no more hard-coded rates!
-console.log(`Connected: ${stream.format.description} @ ${stream.rate}Hz`);
+    // Generate PCM audio samples
+    function* generateTone(frequency: number, duration: number) {
+      const totalSamples = duration * stream.rate * stream.channels;
+      const cycle = (Math.PI * 2) / stream.rate;
+      let phase = 0;
 
-// Generate audio using JavaScript Numbers (range: -1.0 to +1.0)
-function* generateTone(frequency: number, duration: number) {
-  const samples = Math.floor(duration * stream.rate * stream.channels);
-  const cycle = (Math.PI * 2) / stream.rate;
-  let phase = 0;
+      for (let i = 0; i < totalSamples; i += stream.channels) {
+        const sample = Math.sin(phase * frequency) * 0.2; // 20% volume
 
-  for (let i = 0; i < samples; i += stream.channels) {
-    const sample = Math.sin(phase * frequency) * 0.1; // 10% volume
-    // Generate samples for each channel
-    for (let ch = 0; ch < stream.channels; ch++) {
-      yield sample;
+        // Output to both stereo channels
+        for (let ch = 0; ch < stream.channels; ch++) {
+          yield sample;
+        }
+        phase += cycle;
+      }
     }
-    phase += cycle;
-  }
-}
 
-await stream.write(generateTone(440, 2.0)); // 2 second A4 note
+    // Play 2-second A4 note
+    await stream.write(generateTone(440, 2.0));
+  } finally {
+    await stream.dispose(); // Clean up stream
+  }
+} finally {
+  await session.dispose(); // Clean up session
+}
 ```
 
 ## 📚 Documentation
 
-- **[🎯 Audio Quality API](docs/AUDIO_QUALITY_API.md)** - Quality-based API (recommended for most users)
-- **[📏 Audio Samples Reference](docs/AUDIO_SAMPLES_REFERENCE.md)** - Quick reference for sample values and common patterns
-- **[🏗️ Architecture](docs/ARCHITECTURE.md)** - Technical overview and design principles
-- **[📝 Coding Style](docs/CODING_STYLE.md)** - Code style guidelines and best practices
-- **[🔬 Development Log](docs/DEVLOG.md)** - Development notes and decision history
+### 🎓 [Tutorials](docs/tutorials/index.md) - _Learn by doing_
 
-## 🎯 Quality Levels
+- **[Getting Started](docs/tutorials/getting-started.md)** - Your first PipeWire audio application
+- **[Building a Simple Synthesizer](docs/tutorials/simple-synthesizer.md)** - Create a tone generator
+- **[Working with Stereo Audio](docs/tutorials/stereo-audio.md)** - Multi-channel audio programming
 
-The API uses quality levels instead of technical audio formats:
+### 🔧 [How-to Guides](docs/how-to-guides/) - _Solve specific problems_
 
-| Quality                  | Best For                    | CPU Usage | Compatibility |
-| ------------------------ | --------------------------- | --------- | ------------- |
-| `AudioQuality.High`      | Music production, mastering | Highest   | Excellent     |
-| `AudioQuality.Standard`  | General apps, games         | Medium    | Excellent     |
-| `AudioQuality.Efficient` | Voice, notifications        | Lowest    | Good          |
+- **[Choose the Right Audio Quality](docs/how-to-guides/choose-audio-quality.md)** - Match quality to your use case
+- **[Generate Common Waveforms](docs/how-to-guides/generate-waveforms.md)** - Sine, square, sawtooth waves
 
-**You always work with JavaScript Numbers in the range -1.0 to +1.0** - the library handles format conversion automatically!
+### 📖 [Reference](docs/reference/) - _Look up technical details_
+
+- **[API Reference](docs/reference/api.md)** - Complete class and method documentation
+- **[Audio Sample Formats](docs/reference/audio-samples.md)** - Sample value ranges and formats
+
+### 💡 [Explanation](docs/explanation/) - _Understand the concepts_
+
+- **[Architecture Overview](docs/explanation/architecture.md)** - How the library is designed
+- **[Quality-Based API Design](docs/explanation/quality-api-design.md)** - Why we chose quality over formats
+- **[Resource Management](docs/explanation/resource-management.md)** - Manual vs automatic cleanup patterns
 
 ## 🎵 Examples
 
-### Different Quality Levels
+Check out the [`examples/`](examples/) directory for complete working demos. Use `npx tsx` to run them without having to compile:
 
-```typescript
-// High quality for music production
-const musicStream = await session.createAudioOutputStream({
-  quality: AudioQuality.High,
-  channels: 2,
-  role: "Music",
-});
-
-// Efficient for system sounds
-const notificationStream = await session.createAudioOutputStream({
-  quality: AudioQuality.Efficient,
-  channels: 2,
-  role: "Notification",
-});
+```bash
+npx tsx examples/hello-pipewire.mts
 ```
 
-### Stereo Audio
+## 📋 Prerequisites
 
-```typescript
-// Generate stereo noise using negotiated stream properties
-function* generateStereoNoise(stream: AudioOutputStream, duration: number) {
-  const samples = Math.floor(duration * stream.rate * stream.channels);
+- **Linux with PipeWire** - PipeWire 0.3+ required
+- **Node.js 22+** - ES modules and modern features required
+- **Build tools** - GCC, make, Python 3
+- **PipeWire headers** - `libpipewire-0.3-dev` package
 
-  for (let i = 0; i < samples; i += stream.channels) {
-    // Generate samples for each channel
-    for (let ch = 0; ch < stream.channels; ch++) {
-      yield (Math.random() - 0.5) * 0.1; // Random noise per channel
-    }
-  }
-}
-
-await stream.write(generateStereoNoise(stream, 3.0)); // 3 seconds
-```
-
-More examples available in the [`examples/`](examples/) directory.
-
-## 🏗️ Design Philosophy
-
-- **Modern JavaScript Patterns** - ESM modules, async/await, resource management with `using`
-- **Low-Level Performance, High-Level API** - Native C++ core with JavaScript convenience
-- **PipeWire Integration** - Professional audio with dynamic format negotiation
-- **User-Friendly** - Quality levels instead of technical formats, automatic conversions
+> **Note:** The examples above use manual cleanup compatible with Node.js 22 LTS. For Node.js 24+, you can use `await using` for automatic resource management. See the [tutorials](docs/tutorials/) for both patterns.
 
 ## 🤝 Contributing
 
-1. Read the [Coding Style](docs/CODING_STYLE.md) guidelines
-2. Check the [Architecture](docs/ARCHITECTURE.md) documentation
-3. Look at existing examples for patterns
-4. Submit pull requests with tests and documentation
-
-## 🛠️ Building
-
-```bash
-# Development setup
-npm install
-npm run build
-
-# Run examples
-npx tsx examples/hello-pipewire.mts
-npx tsx examples/quality-demo.mts
-```
+1. Read [Contributing Guidelines](docs/explanation/contributing.md)
+2. Check [Architecture Overview](docs/explanation/architecture.md)
+3. Follow [Coding Style](docs/explanation/coding-style.md)
+4. Run examples to test changes
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Keywords:** audio, pipewire, linux, streaming, real-time, typescript, node.js
+**🎵 Build amazing audio applications with modern JavaScript and professional PipeWire performance!**
