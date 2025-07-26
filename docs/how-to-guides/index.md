@@ -24,6 +24,26 @@ Minimize audio latency for real-time applications.
 - Creating real-time audio effects
 - Developing live performance tools
 
+### ✅ [Test Negotiated Audio Formats](test-negotiated-formats.md)
+
+Verify that your audio streams negotiate the expected formats and quality levels.
+
+**When to use:**
+
+- Validating quality level behavior
+- Debugging format negotiation issues
+- Ensuring cross-platform compatibility
+
+### 📈 [Monitor Performance](monitor-performance.md)
+
+Track audio processing performance and identify bottlenecks.
+
+**When to use:**
+
+- Optimizing audio processing performance
+- Comparing quality level efficiency
+- Monitoring real-time performance metrics
+
 ## Audio Generation and Processing
 
 ### 🌊 [Generate Common Waveforms](generate-waveforms.md)
@@ -36,7 +56,17 @@ Create fundamental audio waveforms and synthesis techniques.
 - Creating sound effects
 - Learning audio synthesis fundamentals
 
-### 🎛️ [Mix Multiple Audio Sources](mix-audio-sources.md)
+### � [Create Stereo Audio Effects](create-stereo-effects.md)
+
+Implement panning, binaural beats, and spatial audio effects.
+
+**When to use:**
+
+- Creating immersive audio experiences
+- Building music production tools
+- Adding spatial effects to games or applications
+
+### �🎛️ [Mix Multiple Audio Sources](mix-audio-sources.md)
 
 Combine and control multiple audio streams effectively.
 
@@ -132,6 +162,19 @@ Gracefully respond to audio hardware changes.
 - Adapting to user device preferences
 - Handling device failures and recovery
 
+## Project and Development
+
+### 📝 [Author Documentation](author-documentation.md)
+
+Create and maintain high-quality documentation for the project.
+
+**When to use:**
+
+- Writing new tutorials, how-to guides, reference docs, or explanations
+- Contributing to the project documentation
+- Setting up automated documentation workflows
+- Following documentation standards and best practices
+
 ## How-to Guide Structure
 
 Each guide provides:
@@ -165,3 +208,14 @@ Each guide provides:
 - **API details?** → See [Reference](../reference/)
 - **Learning basics?** → Start with [Tutorials](../tutorials/)
 - **Specific error?** → Try [Debug Audio Issues](debug-audio-issues.md)
+
+### 📡 [Monitor Stream State and Events](monitor-stream-events.md)
+
+Handle stream lifecycle events and monitor connection state for robust applications.
+
+**When to use:**
+
+- Building resilient audio applications
+- Monitoring stream health and connection status
+- Responding to format negotiation and errors
+- Debugging connection issues

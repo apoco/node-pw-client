@@ -90,6 +90,7 @@ Napi::Value PipeWireSession::start(const Napi::CallbackInfo& info)
             });
         },
         [this, env]() {
+            this->Unref(); // Release the reference taken at the start
             return env.Undefined();
         });
 }
@@ -137,8 +138,6 @@ Napi::Value PipeWireSession::destroy(const Napi::CallbackInfo& info)
             loop = NULL;
         }
 
-        // Success callback - unref to allow garbage collection and return undefined
-        this->Unref();
-        return env.Undefined(); // Return proper undefined value
+        return env.Undefined();
     });
 }

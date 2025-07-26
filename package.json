@@ -14,18 +14,40 @@
     "node": ">=22.0.0"
   },
   "module": "./dist/index.mjs",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs"
+    }
+  },
   "devDependencies": {
+    "@eslint/js": "^9.31.0",
     "@tsconfig/node22": "^22.0.1",
+    "@types/eslint__js": "^8.42.3",
     "@types/node": "^22.16.3",
+    "eslint": "^9.31.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.3",
     "node-addon-api": "^8.3.1",
     "node-gyp": "^11.2.0",
     "prettier": "^3.5.3",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typedoc": "^0.28.7",
+    "typedoc-plugin-markdown": "^4.7.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.37.0"
   },
   "scripts": {
-    "build": "npm run build:native:debug && npx tsc",
+    "build": "npm run build:native:debug && npx tsc --project tsconfig.build.json",
     "build:native": "node-gyp build",
-    "build:native:debug": "npm run build:native -- --debug"
+    "build:native:debug": "npm run build:native -- --debug",
+    "docs:generate": "npm run docs:examples && npm run docs:api",
+    "docs:examples": "tsx scripts/generate-docs.mts",
+    "docs:api": "npx typedoc",
+    "test:snippets": "tsx scripts/test-examples.mts",
+    "test": "npm run test:snippets",
+    "lint": "eslint .snippets lib scripts --ext .mts",
+    "lint:fix": "eslint .snippets lib scripts --ext .mts --fix",
+    "format": "prettier --write \".snippets/**/*.mts\" \"lib/**/*.mts\" \"scripts/**/*.mts\"",
+    "check": "npm run lint && npm run format"
   }
 }

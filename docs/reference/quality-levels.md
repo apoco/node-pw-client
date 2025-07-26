@@ -4,383 +4,101 @@ Technical details and specifications for each audio quality level in the PipeWir
 
 ## Quality Level Overview
 
-| Quality     | Format Priority                   | Typical Negotiated    | CPU Usage | Latency | Best For             |
-| ----------- | --------------------------------- | --------------------- | --------- | ------- | -------------------- |
-| `High`      | Float64 → Float32 → Int32 → Int16 | Float32 44.1kHz-96kHz | High      | Lowest  | Professional audio   |
-| `Standard`  | Float32 → Float64 → Int16 → Int32 | Float32 44.1kHz-48kHz | Medium    | Medium  | General applications |
-| `Efficient` | Int16 → Int32 → Float32 → Float64 | Int16 44.1kHz         | Low       | Higher  | System sounds, voice |
+| Quality     | Format Priority                              | Sample Rate Priority                      | Typical Negotiated    | CPU Usage | Best For             |
+| ----------- | -------------------------------------------- | ----------------------------------------- | --------------------- | --------- | -------------------- |
+| `High`      | Float64 → Float32 → Int32 → Int24_32 → Int16 | 192000 → 96000 → 88200 → 48000 → 44100 Hz | Float32 44.1kHz-96kHz | High      | Professional audio   |
+| `Standard`  | Float32 → Float64 → Int16 → Int32            | 48000 → 44100 → 96000 → 88200 → 32000 Hz  | Float32 44.1kHz-48kHz | Medium    | General applications |
+| `Efficient` | Int16 → Float32 → Float64 → Int32            | 44100 → 48000 → 32000 → 22050 → 16000 Hz  | Int16 44.1kHz         | Low       | System sounds, voice |
 
-## AudioQuality.High
+## Supported Audio Formats
 
-### Format Negotiation Strategy
+Complete technical specifications for all PipeWire audio formats supported by this library:
 
-1. **Float64** (64-bit floating-point)
+| Format   | Total Bits | Precision | Dynamic Range | Memory/Sample | Best For                    |
+| -------- | ---------- | --------- | ------------- | ------------- | --------------------------- |
+| Float64  | 64-bit     | 52-bit    | ~144+ dB      | 8 bytes       | Ultimate precision/analysis |
+| Float32  | 32-bit     | 23-bit    | ~138 dB       | 4 bytes       | Professional audio          |
+| Int32    | 32-bit     | 31-bit    | ~192 dB       | 4 bytes       | Ultra-high precision        |
+| Int24_32 | 24-bit     | 23-bit    | ~144 dB       | 4 bytes       | Professional standard       |
+| Int16    | 16-bit     | 15-bit    | ~96 dB        | 2 bytes       | CD-quality, efficiency      |
 
-   - Range: ±1.79769e+308 (practically ±∞ for audio)
-   - Precision: ~15-17 decimal digits
-   - Use case: Ultimate precision for analysis
+### Technical Notes
 
-2. **Float32** (32-bit floating-point)
+- **Precision**: Effective bits contributing to audio resolution (mantissa for floats, total-1 for signed integers)
+- **Dynamic Range**: Theoretical signal-to-noise ratio in decibels
+- **All formats**: JavaScript input is always normalized -1.0 to +1.0 range
 
-   - Range: ±3.4028e+38 (practically ±∞ for audio)
-   - Precision: ~6-9 decimal digits
-   - Use case: Professional audio production
+## Supported Sample Rates
 
-3. **Int32** (32-bit signed integer)
+All sample rates supported by PipeWire and this library:
 
-   - Range: -2,147,483,648 to +2,147,483,647
-   - Dynamic range: ~192 dB
-   - Use case: Ultra-high-precision digital audio
+| Sample Rate | Description                 | Use Case                      | CPU Impact |
+| ----------- | --------------------------- | ----------------------------- | ---------- |
+| 192000 Hz   | Ultra-high professional     | High-end mastering, analysis  | Very High  |
+| 96000 Hz    | High-end professional audio | Studio recording, mastering   | High       |
+| 88200 Hz    | High professional rate      | DVD-Audio, professional work  | High       |
+| 48000 Hz    | Professional standard       | Most professional audio       | Medium     |
+| 44100 Hz    | CD audio standard           | Consumer audio, compatibility | Low        |
+| 32000 Hz    | Digital broadcast standard  | DAB, some streaming formats   | Low        |
+| 22050 Hz    | Half CD rate                | Low-bandwidth applications    | Very Low   |
+| 16000 Hz    | Wideband speech             | Voice communication, VoIP     | Very Low   |
+| 8000 Hz     | Telephony quality           | Basic voice communication     | Minimal    |
 
-4. **Int16** (16-bit signed integer)
-   - Range: -32,768 to +32,767
-   - Dynamic range: ~96 dB
-   - Use case: CD-quality audio fallback
+### Technical Notes
 
-### Technical Characteristics
+- **Higher rates**: Better frequency response, more CPU intensive
+- **Standard rates**: 44.1kHz and 48kHz are most widely supported
+- **Professional preference**: 48kHz is preferred for new professional work
+- **Compatibility**: 44.1kHz offers best compatibility across devices
 
-```typescript
-// Typical negotiated format
-{
-  name: "Float32",
-  description: "Float32 Stereo",
-  bitDepth: 32,
-  isFloat: true,
-  isSigned: true
-}
-```
+### Sample Rate and Frequency Response Explained
 
-**Sample Rate Priority:**
+**Frequency response** refers to the range of audio frequencies (pitches) that can be accurately captured and reproduced. Sample rate directly determines this range through the **Nyquist theorem**: the maximum representable frequency is half the sample rate.
 
-- 96000 Hz (high-end audio interfaces)
-- 48000 Hz (professional standard)
-- 44100 Hz (CD standard)
+**Why this matters for audio quality:**
 
-**Buffer Configuration:**
+- **Human hearing range**: ~20 Hz to 20,000 Hz (20 kHz)
+- **44.1 kHz sample rate**: Can represent up to ~22 kHz (covers full human hearing range)
+- **48 kHz sample rate**: Can represent up to ~24 kHz (extra headroom for processing)
+- **Higher rates**: Allow better anti-aliasing filters and more processing headroom
 
-- Minimum buffer size for lowest latency
-- Optimized for real-time performance
-- Priority on minimal processing delay
+**Real-world frequency examples:**
 
-**CPU Overhead:**
+- **Bass frequencies**: 20-250 Hz (kick drums, bass guitar, low piano notes)
+- **Midrange**: 250-4,000 Hz (most vocals, guitars, important for speech clarity)
+- **High frequencies**: 4,000-20,000 Hz (cymbals, violin harmonics, vocal sibilants, "air" and "sparkle")
 
-- Higher due to format conversion
-- Floating-point processing optimizations
-- May use SIMD instructions where available
+**Practical implications:**
 
-## AudioQuality.Standard
-
-### Format Negotiation Strategy
-
-1. **Float32** (32-bit floating-point)
-
-   - Optimal balance of precision and performance
-   - Native format for most modern audio systems
-   - Direct processing without conversion overhead
-
-2. **Float64** (64-bit floating-point)
-
-   - Available if system prefers higher precision
-   - Automatic conversion from JavaScript Numbers
-
-3. **Int16** (16-bit signed integer)
-
-   - Widely compatible fallback
-   - Sufficient for most consumer audio
-
-4. **Int32** (32-bit signed integer)
-   - Professional fallback option
-   - Better than Int16 when available
-
-### Technical Characteristics
-
-```typescript
-// Typical negotiated format
-{
-  name: "Float32",
-  description: "Float32 Stereo",
-  bitDepth: 32,
-  isFloat: true,
-  isSigned: true
-}
-```
-
-**Sample Rate Priority:**
-
-- 48000 Hz (modern standard)
-- 44100 Hz (CD compatibility)
-- 96000 Hz (if available without overhead)
-
-**Buffer Configuration:**
-
-- Balanced buffer size
-- Good compromise between latency and stability
-- Suitable for interactive applications
-
-**CPU Overhead:**
-
-- Optimized conversion paths
-- Reasonable overhead for most systems
-- Good performance/quality balance
-
-## AudioQuality.Efficient
-
-### Format Negotiation Strategy
-
-1. **Int16** (16-bit signed integer)
-
-   - Minimal CPU overhead
-   - Compact memory usage
-   - Sufficient for voice and simple audio
-
-2. **Int32** (32-bit signed integer)
-
-   - Higher precision when Int16 unavailable
-   - Still maintains efficiency focus
-
-3. **Float32** (32-bit floating-point)
-
-   - Fallback to floating-point if required
-   - Less preferred due to conversion overhead
-
-4. **Float64** (64-bit floating-point)
-   - Last resort, highest conversion cost
-   - Maintained for compatibility
-
-### Technical Characteristics
-
-```typescript
-// Typical negotiated format
-{
-  name: "Int16",
-  description: "Int16 Stereo",
-  bitDepth: 16,
-  isFloat: false,
-  isSigned: true
-}
-```
-
-**Sample Rate Priority:**
-
-- 44100 Hz (standard, widely supported)
-- 48000 Hz (if no additional overhead)
-- Lower rates accepted for maximum efficiency
-
-**Buffer Configuration:**
-
-- Larger buffers acceptable
-- Focus on CPU efficiency over latency
-- Optimized for battery life
-
-**CPU Overhead:**
-
-- Minimal conversion overhead
-- Integer-based processing when possible
-- Optimized for low-power devices
+- **8 kHz (telephony)**: Cuts off at 4 kHz, loses most high-frequency content, sounds muffled
+- **16 kHz (wideband speech)**: Cuts off at 8 kHz, good for speech but loses musical highs
+- **44.1 kHz (CD quality)**: Captures full human hearing range, excellent for music
+- **48+ kHz (professional)**: Provides headroom for processing without aliasing artifacts
 
 ## Format Conversion Details
 
+### Audio Dynamic Range Explained
+
+**Dynamic range** refers to the ratio between the largest and smallest representable signal levels, expressed in decibels (dB). This is about **resolution** and **precision**, not absolute loudness:
+
+- **Higher bit depth** = more steps between silence and maximum signal
+- **More precision** = finer gradations, lower quantization noise
+- **Actual loudness** is controlled by amplification, not bit depth
+
+For example:
+
+- 16-bit: ~65,536 discrete levels between -1.0 and +1.0
+- 24-bit: ~16.7 million discrete levels in the same range
+- 32-bit float: ~8.4 million usable levels with extended dynamic range
+
 ### JavaScript Number to Audio Format
 
-All audio samples start as JavaScript `Number` values (IEEE 754 double-precision):
+All audio samples start as JavaScript `Number` values (IEEE 754 double-precision) and are automatically converted to the negotiated audio format.
 
-```javascript
-const sample = 0.5; // JavaScript Number (Float64)
-```
+**Conversion Details**: For implementation specifics, see the conversion functions in [`src/audio-output-stream.cpp`](../../src/audio-output-stream.cpp).
 
-### Conversion Process
+## Related Guides
 
-#### To Float32
-
-```cpp
-// C++ conversion (simplified)
-float convertToFloat32(double jsNumber) {
-    // Clamp to valid audio range
-    double clamped = std::max(-1.0, std::min(1.0, jsNumber));
-    return static_cast<float>(clamped);
-}
-```
-
-#### To Int16
-
-```cpp
-// C++ conversion (simplified)
-int16_t convertToInt16(double jsNumber) {
-    // Clamp and scale to Int16 range
-    double clamped = std::max(-1.0, std::min(1.0, jsNumber));
-    return static_cast<int16_t>(clamped * 32767.0);
-}
-```
-
-#### To Int32
-
-```cpp
-// C++ conversion (simplified)
-int32_t convertToInt32(double jsNumber) {
-    // Clamp and scale to Int32 range
-    double clamped = std::max(-1.0, std::min(1.0, jsNumber));
-    return static_cast<int32_t>(clamped * 2147483647.0);
-}
-```
-
-## Performance Characteristics
-
-### Relative Performance Comparison
-
-```
-Conversion Cost (relative):
-Int16:   1.0x (baseline)
-Int32:   1.2x
-Float32: 1.1x
-Float64: 1.5x
-
-Memory Usage (per sample):
-Int16:   2 bytes
-Int32:   4 bytes
-Float32: 4 bytes
-Float64: 8 bytes
-
-Dynamic Range:
-Int16:   ~96 dB
-Int32:   ~192 dB
-Float32: ~144 dB (24-bit equivalent)
-Float64: ~1000+ dB (impractical range)
-```
-
-### Benchmark Results
-
-Typical performance on modern hardware (samples per second):
-
-```
-Quality Level | Format  | Throughput  | CPU Usage
---------------|---------|-------------|----------
-High          | Float32 | 2.1M sps    | 15%
-Standard      | Float32 | 2.4M sps    | 12%
-Efficient     | Int16   | 3.1M sps    | 8%
-```
-
-## Real-World Format Distribution
-
-### Common Negotiated Formats by System
-
-**Desktop Linux (PipeWire 0.3.x):**
-
-- High: Float32 @ 48kHz (95%), Float64 @ 48kHz (5%)
-- Standard: Float32 @ 48kHz (90%), Int16 @ 44.1kHz (10%)
-- Efficient: Int16 @ 44.1kHz (85%), Int16 @ 48kHz (15%)
-
-**Professional Audio Interfaces:**
-
-- High: Float32 @ 96kHz (60%), Float32 @ 48kHz (40%)
-- Standard: Float32 @ 48kHz (95%), Float32 @ 96kHz (5%)
-- Efficient: Int16 @ 44.1kHz (100%)
-
-**Embedded/Low-Power Systems:**
-
-- High: Float32 @ 48kHz (70%), Int16 @ 48kHz (30%)
-- Standard: Int16 @ 44.1kHz (60%), Float32 @ 48kHz (40%)
-- Efficient: Int16 @ 44.1kHz (95%), Int16 @ 22kHz (5%)
-
-## Quality Validation
-
-### Runtime Format Checking
-
-```typescript
-async function validateQuality(
-  stream: AudioOutputStream,
-  expectedQuality: AudioQuality
-) {
-  await stream.connect();
-
-  const format = stream.format;
-  const rate = stream.rate;
-
-  switch (expectedQuality) {
-    case AudioQuality.High:
-      console.assert(
-        format.isFloat || format.bitDepth >= 24,
-        "High quality should prefer floating-point or high bit depth"
-      );
-      console.assert(
-        rate >= 44100,
-        "High quality should have adequate sample rate"
-      );
-      break;
-
-    case AudioQuality.Standard:
-      console.assert(
-        format.bitDepth >= 16,
-        "Standard quality should have at least 16-bit depth"
-      );
-      console.assert(
-        rate >= 44100,
-        "Standard quality should have CD-quality sample rate"
-      );
-      break;
-
-    case AudioQuality.Efficient:
-      // Efficient accepts any format that works
-      console.assert(
-        format.bitDepth >= 8,
-        "Efficient quality should have reasonable bit depth"
-      );
-      break;
-  }
-
-  console.log(`✅ ${expectedQuality} quality validation passed`);
-  console.log(`   Format: ${format.description}`);
-  console.log(`   Rate: ${rate}Hz`);
-}
-```
-
-### Performance Monitoring
-
-```typescript
-function benchmarkQuality(quality: AudioQuality) {
-  const startTime = performance.now();
-  const testDuration = 1.0; // seconds
-
-  return new Promise(async (resolve) => {
-    await using session = await startSession();
-    await using stream = await session.createAudioOutputStream({
-      name: `Benchmark ${quality}`,
-      quality,
-      channels: 2,
-    });
-
-    await stream.connect();
-
-    // Generate test audio
-    function* testSignal() {
-      const samples = testDuration * stream.rate * stream.channels;
-      for (let i = 0; i < samples; i++) {
-        yield Math.sin(i * 0.01) * 0.1;
-      }
-    }
-
-    await stream.write(testSignal());
-
-    const endTime = performance.now();
-    const processingTime = endTime - startTime;
-    const realTimeRatio = processingTime / (testDuration * 1000);
-
-    resolve({
-      quality,
-      format: stream.format.description,
-      rate: stream.rate,
-      processingTimeMs: processingTime,
-      realTimeRatio,
-      efficiency: 1 / realTimeRatio, // Higher is better
-    });
-  });
-}
-```
-
-## Summary
-
-- **High Quality**: Prioritizes Float64/Float32 for maximum precision and minimal latency
-- **Standard Quality**: Balances Float32/Int16 for good performance and quality
-- **Efficient Quality**: Prefers Int16 for minimal CPU usage and maximum compatibility
-- **Format conversion**: Automatic conversion from JavaScript Numbers to target format
-- **Performance**: Quality level significantly impacts CPU usage and processing overhead
-- **Validation**: Always check negotiated format to verify expectations are met
+- **[Choose the Right Audio Quality](../how-to-guides/choose-audio-quality.md)** - Select optimal quality levels for your use case
+- **[Test Negotiated Audio Formats](../how-to-guides/test-negotiated-formats.md)** - Verify format negotiation behavior
+- **[Monitor Performance](../how-to-guides/monitor-performance.md)** - Track performance metrics across quality levels

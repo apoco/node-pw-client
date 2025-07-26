@@ -1,19 +1,23 @@
 import EventEmitter, { once } from "node:events";
-import { AudioFormat, OutputBuffer } from "./audio-format.mjs";
+import { AudioFormat, type OutputBuffer } from "./audio-format.mjs";
 import {
   AudioQuality,
   getFormatPreferences,
   getRatePreferences,
 } from "./audio-quality.mjs";
-import { NativePipeWireSession } from "./session.mjs";
+import type { NativePipeWireSession } from "./session.mjs";
 import * as Props from "./props.mjs";
-import { Latency, StreamState, streamStateToName } from "./stream.mjs";
+import {
+  type Latency,
+  type StreamState,
+  streamStateToName,
+} from "./stream.mjs";
 import { adaptSamples } from "./format-negotiation.mjs";
 
-export type NativeAudioOutputStream = {
+export interface NativeAudioOutputStream {
   connect: (options?: {
-    preferredFormats?: number[];
-    preferredRates?: number[];
+    preferredFormats?: Array<number>;
+    preferredRates?: Array<number>;
   }) => Promise<void>;
   disconnect: () => Promise<void>;
   get bufferSize(): number;
@@ -21,9 +25,33 @@ export type NativeAudioOutputStream = {
   isReady: () => Promise<number>;
   isFinished: () => Promise<void>;
   destroy: () => Promise<void>;
-};
+}
 
-export type AudioOutputStreamOpts = {
+/**
+ * Configuration options for creating audio output streams.
+ * All options are optional with sensible defaults.
+ *
+ * @property name - Human-readable name displayed in PipeWire clients (default: "Node.js Audio")
+ * @property rate - Sample rate in Hz (default: 48000)
+ * @property channels - Number of audio channels (default: 2 for stereo)
+ * @property role - Audio role hint for PipeWire routing (default: "Music")
+ * @property quality - Quality preset that affects format negotiation (default: AudioQuality.Standard)
+ * @property preferredFormats - Override format negotiation order
+ * @property preferredRates - Override sample rate negotiation order
+ * @property autoConnect - Whether to auto-connect after creation (default: false)
+ *
+ * @example
+ * ```typescript
+ * const opts: AudioOutputStreamOpts = {
+ *   name: "My Synthesizer",
+ *   rate: 44100,
+ *   channels: 2,
+ *   quality: AudioQuality.High,
+ *   role: "Music"
+ * };
+ * ```
+ */
+export interface AudioOutputStreamOpts {
   name?: string;
   rate?: number;
   channels?: number;
@@ -40,12 +68,12 @@ export type AudioOutputStreamOpts = {
     | "Accessibility"
     | "Test";
   quality?: AudioQuality;
-  preferredFormats?: AudioFormat[];
-  preferredRates?: number[];
+  preferredFormats?: Array<AudioFormat>;
+  preferredRates?: Array<number>;
   autoConnect?: boolean;
-};
+}
 
-export type AudioOutputStreamProps = {
+export interface AudioOutputStreamProps {
   volume: number;
   mute: boolean;
   monitorMute: boolean;
@@ -58,39 +86,176 @@ export type AudioOutputStreamProps = {
     softVolume: number;
   }>;
   params: Record<string, unknown>;
-};
+}
 
-type AudioEvents = {
+interface AudioEvents {
   propsChange: [AudioOutputStreamProps];
   formatChange: [{ format: AudioFormat; channels: number; rate: number }];
   latencyChange: [Latency];
   unknownParamChange: [number];
   stateChange: [StreamState];
   error: [Error];
-};
+}
 
+/**
+ * Audio output stream for playing audio samples to PipeWire.
+ * Streams are event emitters that provide real-time feedback about format changes,
+ * latency updates, and connection state.
+ *
+ * @interface AudioOutputStream
+ * @extends EventEmitter
+ *
+ * @example
+ * ```typescript
+ * const stream = await session.createAudioOutputStream({
+ *   name: "Audio Generator",
+ *   channels: 2,
+ *   quality: AudioQuality.High
+ * });
+ *
+ * await stream.connect();
+ * await stream.write(audioSamples);
+ * await stream.disconnect();
+ * ```
+ *
+ * ## Events
+ *
+ * AudioOutputStream emits the following events:
+ *
+ * ### `formatChange`
+ * Emitted when the stream's audio format is negotiated or changes.
+ *
+ * **Event payload:** `{ format: AudioFormat, channels: number, rate: number }`
+ *
+ * ```typescript
+ * stream.on('formatChange', ({ format, channels, rate }) => {
+ *   console.log(`Format: ${format.description}, ${channels}ch @ ${rate}Hz`);
+ * });
+ * ```
+ *
+ * ### `stateChange`
+ * Emitted when the stream's connection state changes.
+ *
+ * **Event payload:** `StreamState` (string: "error", "unconnected", "connecting", "paused", "streaming")
+ *
+ * ```typescript
+ * stream.on('stateChange', (state) => {
+ *   console.log(`Stream state: ${state}`);
+ * });
+ * ```
+ *
+ * ### `latencyChange`
+ * Emitted when the stream's latency information updates.
+ *
+ * **Event payload:** `{ min: number, max: number, default: number }` (all values in nanoseconds)
+ *
+ * ```typescript
+ * stream.on('latencyChange', ({ min, max, default: def }) => {
+ *   console.log(`Latency: ${def/1000000}ms (range: ${min/1000000}-${max/1000000}ms)`);
+ * });
+ * ```
+ *
+ * ### `propsChange`
+ * Emitted when stream properties (volume, mute, etc.) change.
+ *
+ * **Event payload:** `AudioOutputStreamProps`
+ *
+ * ```typescript
+ * stream.on('propsChange', (props) => {
+ *   console.log(`Volume: ${props.volume}, Muted: ${props.mute}`);
+ * });
+ * ```
+ *
+ * ### `error`
+ * Emitted when an error occurs during streaming.
+ *
+ * **Event payload:** `Error`
+ *
+ * ```typescript
+ * stream.on('error', (error) => {
+ *   console.error('Stream error:', error.message);
+ * });
+ * ```
+ *
+ * ### `unknownParamChange`
+ * Emitted when PipeWire sends an unrecognized parameter change.
+ *
+ * **Event payload:** `number` (parameter ID)
+ *
+ * ```typescript
+ * stream.on('unknownParamChange', (paramId) => {
+ *   console.log(`Unknown parameter changed: ${paramId}`);
+ * });
+ * ```
+ */
 export interface AudioOutputStream extends EventEmitter<AudioEvents> {
+  /**
+   * Connect the stream to PipeWire audio system.
+   * Triggers format negotiation and initializes audio processing.
+   */
   connect: () => Promise<void>;
+
+  /**
+   * Disconnect the stream from PipeWire.
+   * Stops audio processing and releases resources.
+   */
   disconnect: () => Promise<void>;
+
+  /**
+   * Write audio samples to the stream.
+   * Samples are JavaScript Numbers (-1.0 to 1.0) converted to negotiated format.
+   */
   write: (samples: Iterable<number>) => Promise<void>;
+
+  /**
+   * Wait for all buffered audio to finish playing.
+   * Useful for ensuring complete playback before cleanup.
+   */
   isFinished: () => Promise<void>;
+
+  /**
+   * Dispose of the stream and release all resources.
+   * Alternative to disconnect() for final cleanup.
+   */
   dispose: () => Promise<void>;
+
+  /**
+   * Get the negotiated audio format after connection.
+   * Available only after successful connect().
+   */
   get format(): AudioFormat;
+
+  /**
+   * Get the negotiated number of audio channels.
+   * Available only after successful connect().
+   */
   get channels(): number;
+
+  /**
+   * Get the negotiated sample rate in Hz.
+   * Available only after successful connect().
+   */
   get rate(): number;
+
+  /**
+   * Check if the stream is currently connected to PipeWire.
+   */
   get isConnected(): boolean;
+
+  /**
+   * Automatic resource cleanup for `await using` syntax.
+   * Equivalent to calling dispose().
+   */
   [Symbol.asyncDispose]: () => Promise<void>;
 }
 
-export type TypedNumericArray = {
+export interface TypedNumericArray {
   [index: number]: number;
   buffer: ArrayBuffer;
   subarray(offset: number, length: number): TypedNumericArray;
-};
+}
 
-export type TypedNumericArrayCtor = {
-  new (size: number): TypedNumericArray;
-};
+export type TypedNumericArrayCtor = new (size: number) => TypedNumericArray;
 
 export class AudioOutputStreamImpl
   extends EventEmitter<AudioEvents>
@@ -108,16 +273,15 @@ export class AudioOutputStreamImpl
   #nativeStream!: NativeAudioOutputStream;
   #connectionConfig!: {
     quality: AudioQuality;
-    preferredFormats?: AudioFormat[];
-    preferredRates?: number[];
+    preferredFormats?: Array<AudioFormat>;
+    preferredRates?: Array<number>;
   };
-  #isConnected: boolean = false;
-  #autoConnect: boolean = false;
-  #formatNegotiated: boolean = false;
+  #isConnected = false;
+  #autoConnect = false;
 
   #negotiatedFormat!: AudioFormat;
-  #negotiatedChannels: number = 2;
-  #negotiatedRate: number = 48_000;
+  #negotiatedChannels = 2;
+  #negotiatedRate = 48_000;
 
   private constructor() {
     super();
@@ -170,7 +334,7 @@ export class AudioOutputStreamImpl
       props: Record<string, string>;
     }
   ) {
-    return session.createAudioOutputStream({
+    return await session.createAudioOutputStream({
       name: config.name,
       format: AudioFormat.Float64.enumValue,
       bytesPerSample: AudioFormat.Float64.byteSize,
@@ -236,7 +400,6 @@ export class AudioOutputStreamImpl
     });
 
     await formatNegotiation;
-    this.#formatNegotiated = true;
     this.#isConnected = true;
   }
 
@@ -291,7 +454,9 @@ export class AudioOutputStreamImpl
       output.set(offset++, sample);
     }
 
-    output && this.#nativeStream.write(output.subarray(0, offset).buffer);
+    if (output) {
+      this.#nativeStream.write(output.subarray(0, offset).buffer);
+    }
   }
 
   isFinished() {

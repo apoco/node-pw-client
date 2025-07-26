@@ -8,8 +8,12 @@ Learn how to combine multiple audio streams, create layered soundscapes, and imp
 
 The most basic way to mix audio is to add samples together:
 
-```javascript
-function* mixAudioSources(...generators) {
+<!-- basic-mixing.mts#simple-addition-mixing -->
+
+```typescript
+function* mixAudioSources(
+  ...generators: Array<Iterable<number, unknown, unknown>>
+) {
   const iterators = generators.map((gen) => gen[Symbol.iterator]());
 
   while (true) {
@@ -32,27 +36,23 @@ function* mixAudioSources(...generators) {
     yield mixedSample / Math.max(1, activeCount);
   }
 }
-
-// Usage
-function* tone1() {
-  /* 440Hz tone */
-}
-function* tone2() {
-  /* 880Hz tone */
-}
-function* noise() {
-  /* white noise */
-}
-
-await stream.write(mixAudioSources(tone1(), tone2(), noise()));
 ```
+
+**Example:** Run `npx tsx examples/basic-mixing.mts` to hear simple addition mixing in action.
 
 ### Weighted Mixing
 
 Control the relative volume of each source:
 
-```javascript
-function* weightedMix(sources) {
+<!-- basic-mixing.mts#weighted-mixing -->
+
+```typescript
+function* mixWeighted(
+  sources: Array<{
+    generator: Iterable<number, unknown, unknown>;
+    weight: number;
+  }>
+) {
   const iterators = sources.map(({ generator, weight }) => ({
     iterator: generator[Symbol.iterator](),
     weight,
@@ -71,18 +71,9 @@ function* weightedMix(sources) {
     }
 
     if (activeCount === 0) break;
-    yield Math.max(-1, Math.min(1, mixedSample)); // Clamp to valid range
+    yield mixedSample;
   }
 }
-
-// Usage with different volumes
-await stream.write(
-  weightedMix([
-    { generator: backgroundMusic(), weight: 0.3 }, // Quiet background
-    { generator: melody(), weight: 0.7 }, // Prominent melody
-    { generator: sfx(), weight: 0.5 }, // Medium sound effects
-  ])
-);
 ```
 
 ## Advanced Mixing Techniques
@@ -91,41 +82,54 @@ await stream.write(
 
 Smoothly transition from one audio source to another:
 
-```javascript
-function* crossfade(sourceA, sourceB, duration, sampleRate = 48000) {
-  const iteratorA = sourceA[Symbol.iterator]();
-  const iteratorB = sourceB[Symbol.iterator]();
-  const totalSamples = Math.floor(duration * sampleRate);
+<!-- crossfade-mixing.mts#crossfade-mixing -->
 
-  for (let i = 0; i < totalSamples; i++) {
-    const fadeRatio = i / totalSamples; // 0 to 1
-    const gainA = 1 - fadeRatio; // 1 to 0
-    const gainB = fadeRatio; // 0 to 1
+```typescript
+function* crossfade(
+  source1: Iterable<number>,
+  source2: Iterable<number>,
+  fadeLength: number
+) {
+  const iter1 = source1[Symbol.iterator]();
+  const iter2 = source2[Symbol.iterator]();
 
-    const { value: sampleA = 0 } = iteratorA.next();
-    const { value: sampleB = 0 } = iteratorB.next();
+  let sampleCount = 0;
 
-    yield sampleA * gainA + sampleB * gainB;
-  }
+  while (true) {
+    const result1 = iter1.next();
+    const result2 = iter2.next();
 
-  // Continue with source B
-  let nextB = iteratorB.next();
-  while (!nextB.done) {
-    yield nextB.value;
-    nextB = iteratorB.next();
+    if (result1.done && result2.done) break;
+
+    const sample1 = result1.done ? 0 : result1.value;
+    const sample2 = result2.done ? 0 : result2.value;
+
+    // Calculate crossfade ratio
+    const fadeRatio = Math.min(1, sampleCount / fadeLength);
+    const gain1 = Math.cos(fadeRatio * Math.PI * 0.5); // Smooth fade out
+    const gain2 = Math.sin(fadeRatio * Math.PI * 0.5); // Smooth fade in
+
+    yield sample1 * gain1 + sample2 * gain2;
+    sampleCount++;
   }
 }
-
-// Usage
-await stream.write(crossfade(oldTrack(), newTrack(), 3.0)); // 3-second crossfade
 ```
+
+**Example:** Run `npx tsx examples/crossfade-mixing.mts` to hear smooth crossfading between sine and square waves.
 
 ### Dynamic Ducking
 
 Automatically reduce background volume when foreground audio plays:
 
-```javascript
-function* duckingMix(foreground, background, threshold = 0.1, duckRatio = 0.3) {
+<!-- ducking-mixing.mts#ducking-mixing -->
+
+```typescript
+function* duckingMix(
+  foreground: Iterable<number, unknown, unknown>,
+  background: Iterable<number, unknown, unknown>,
+  threshold = 0.1,
+  duckRatio = 0.3
+) {
   const foregroundIter = foreground[Symbol.iterator]();
   const backgroundIter = background[Symbol.iterator]();
 
@@ -135,8 +139,8 @@ function* duckingMix(foreground, background, threshold = 0.1, duckRatio = 0.3) {
 
     if (fgResult.done && bgResult.done) break;
 
-    const fgSample = fgResult.value || 0;
-    const bgSample = bgResult.value || 0;
+    const fgSample = typeof fgResult.value === "number" ? fgResult.value : 0;
+    const bgSample = typeof bgResult.value === "number" ? bgResult.value : 0;
 
     // Duck background when foreground is active
     const fgLevel = Math.abs(fgSample);
@@ -145,7 +149,13 @@ function* duckingMix(foreground, background, threshold = 0.1, duckRatio = 0.3) {
     yield fgSample + bgSample * duckingGain;
   }
 }
+```
 
+**Example:** Run `npx tsx examples/ducking-mixing.mts` to hear automatic background ducking during voice segments.
+
+Usage example:
+
+```typescript
 // Usage: voice over music
 await stream.write(duckingMix(voiceOver(), backgroundMusic()));
 ```
@@ -156,22 +166,43 @@ await stream.write(duckingMix(voiceOver(), backgroundMusic()));
 
 Create a full mixer with multiple tracks:
 
-```javascript
-class AudioMixer {
-  constructor(sampleRate = 48000) {
-    this.sampleRate = sampleRate;
+<!-- audio-mixer.mts#audio-mixer-class -->
+
+```typescript
+export class AudioMixer {
+  private readonly tracks: Array<{
+    id: string;
+    generator: Iterable<number, unknown, unknown>;
+    volume: number;
+    pan: number;
+    mute: boolean;
+    solo: boolean;
+    effects: Array<(sample: number) => number>;
+  }>;
+
+  constructor() {
     this.tracks = [];
   }
 
-  addTrack(generator, options = {}) {
+  addTrack(
+    generator: Iterable<number, unknown, unknown>,
+    options: {
+      id?: string;
+      volume?: number;
+      pan?: number;
+      mute?: boolean;
+      solo?: boolean;
+      effects?: Array<(sample: number) => number>;
+    } = {}
+  ) {
     const track = {
-      id: options.id || `track_${this.tracks.length}`,
+      id: options.id ?? `track_${this.tracks.length}`,
       generator,
-      volume: options.volume || 1.0,
-      pan: options.pan || 0.0, // -1 (left) to +1 (right)
-      mute: options.mute || false,
-      solo: options.solo || false,
-      effects: options.effects || [],
+      volume: options.volume ?? 1.0,
+      pan: options.pan ?? 0.0, // -1 (left) to +1 (right)
+      mute: options.mute ?? false,
+      solo: options.solo ?? false,
+      effects: options.effects ?? [],
     };
 
     this.tracks.push(track);
@@ -188,7 +219,7 @@ class AudioMixer {
     const hasSolo = this.tracks.some((track) => track.solo);
 
     while (true) {
-      const channelSums = new Array(channels).fill(0);
+      const channelSums = new Array<number>(channels).fill(0);
       let activeCount = 0;
 
       for (const track of iterators) {
@@ -230,27 +261,31 @@ class AudioMixer {
     }
   }
 
-  setTrackVolume(trackId, volume) {
+  setTrackVolume(trackId: string, volume: number) {
     const track = this.tracks.find((t) => t.id === trackId);
     if (track) track.volume = volume;
   }
 
-  setTrackPan(trackId, pan) {
+  setTrackPan(trackId: string, pan: number) {
     const track = this.tracks.find((t) => t.id === trackId);
     if (track) track.pan = Math.max(-1, Math.min(1, pan));
   }
 
-  muteTrack(trackId, mute = true) {
+  muteTrack(trackId: string, mute = true) {
     const track = this.tracks.find((t) => t.id === trackId);
     if (track) track.mute = mute;
   }
 
-  soloTrack(trackId, solo = true) {
+  soloTrack(trackId: string, solo = true) {
     const track = this.tracks.find((t) => t.id === trackId);
     if (track) track.solo = solo;
   }
 }
+```
 
+Usage example:
+
+```typescript
 // Usage
 const mixer = new AudioMixer(stream.rate);
 
@@ -270,15 +305,30 @@ await stream.write(mixer.mix(stream.channels));
 
 Create a mixer that can be controlled in real-time:
 
-```javascript
+<!-- live-mixer.mts#live-mixer-class -->
+
+```typescript
 class LiveMixer {
+  private readonly tracks: Map<
+    string,
+    {
+      generator: Iterable<number>;
+      iterator: Iterator<number>;
+      volume: number;
+      mute: boolean;
+      finished: boolean;
+    }
+  >;
+  private masterVolume: number;
+  private isPlaying: boolean;
+
   constructor() {
     this.tracks = new Map();
     this.masterVolume = 1.0;
     this.isPlaying = false;
   }
 
-  addTrack(id, generator, initialVolume = 1.0) {
+  addTrack(id: string, generator: Iterable<number>, initialVolume = 1.0) {
     this.tracks.set(id, {
       generator,
       iterator: generator[Symbol.iterator](),
@@ -288,40 +338,40 @@ class LiveMixer {
     });
   }
 
-  removeTrack(id) {
+  removeTrack(id: string) {
     this.tracks.delete(id);
   }
 
-  setVolume(trackId, volume) {
+  setVolume(trackId: string, volume: number) {
     const track = this.tracks.get(trackId);
     if (track) track.volume = volume;
   }
 
-  setMasterVolume(volume) {
+  setMasterVolume(volume: number) {
     this.masterVolume = volume;
   }
 
-  mute(trackId, muted = true) {
+  mute(trackId: string, muted = true) {
     const track = this.tracks.get(trackId);
     if (track) track.mute = muted;
   }
 
   *generateMix(channels = 2) {
     while (this.isPlaying && this.tracks.size > 0) {
-      const channelSums = new Array(channels).fill(0);
+      const channelSums = new Array<number>(channels).fill(0);
       let activeTracks = 0;
 
       // Mix all active tracks
-      for (const [id, track] of this.tracks) {
+      for (const track of this.tracks.values()) {
         if (track.mute || track.finished) continue;
 
-        const { value, done } = track.iterator.next();
-        if (done) {
+        const result = track.iterator.next();
+        if (result.done) {
           track.finished = true;
           continue;
         }
 
-        const sample = value * track.volume * this.masterVolume;
+        const sample = result.value * track.volume * this.masterVolume;
 
         // Add to all channels (mono to stereo)
         for (let ch = 0; ch < channels; ch++) {
@@ -354,8 +404,22 @@ class LiveMixer {
   stop() {
     this.isPlaying = false;
   }
-}
 
+  getTrackCount() {
+    return this.tracks.size;
+  }
+
+  getActiveTrackCount() {
+    return Array.from(this.tracks.values()).filter(
+      (track) => !track.finished && !track.mute
+    ).length;
+  }
+}
+```
+
+Usage example:
+
+```typescript
 // Usage with real-time control
 const liveMixer = new LiveMixer();
 
@@ -385,17 +449,19 @@ setTimeout(() => {
 
 ## Audio Effects in Mixing
 
-### Simple Effects Chain
+### Delay Effect
 
-Add effects to individual tracks or the master bus:
+Add echo/delay effects to your audio:
 
-```javascript
+<!-- audio-utils.mts#delay-effect -->
+
+```typescript
 // Simple delay effect
-function delay(delaySamples, feedback = 0.3, mix = 0.3) {
-  const delayBuffer = new Array(delaySamples).fill(0);
+export function delay(delaySamples: number, feedback = 0.3, mix = 0.3) {
+  const delayBuffer = new Array<number>(delaySamples).fill(0);
   let index = 0;
 
-  return function (sample) {
+  return function (sample: number) {
     const delayed = delayBuffer[index];
     const output = sample + delayed * mix;
 
@@ -405,17 +471,31 @@ function delay(delaySamples, feedback = 0.3, mix = 0.3) {
     return output;
   };
 }
+```
 
+### Low-Pass Filter
+
+Smooth out harsh frequencies:
+
+<!-- audio-utils.mts#lowpass-filter -->
+
+```typescript
 // Simple low-pass filter
-function lowPass(cutoff = 0.1) {
+export function lowPass(cutoff = 0.1) {
   let prev = 0;
 
-  return function (sample) {
+  return function (sample: number) {
     prev = prev + (sample - prev) * cutoff;
     return prev;
   };
 }
+```
 
+### Using Effects in Your Mixer
+
+Usage example:
+
+```typescript
 // Add effects to mixer tracks
 mixer.addTrack(vocalTrack(), {
   id: "vocals",
@@ -429,10 +509,10 @@ mixer.addTrack(vocalTrack(), {
 
 ## Complete Mixing Example
 
-```javascript
-import { startSession, AudioQuality } from "pw-client";
+<!-- basic-mixing.mts#complete-mixing-example -->
 
-async function mixingDemo() {
+```typescript
+async function completeMixingExample() {
   await using session = await startSession();
   await using stream = await session.createAudioOutputStream({
     name: "Audio Mixing Demo",
@@ -455,7 +535,7 @@ async function mixingDemo() {
     }
   }
 
-  function* sineWave(freq, duration) {
+  function* sineWave(freq: number, duration: number) {
     const samples = Math.floor(duration * stream.rate);
     const cycle = (2 * Math.PI) / stream.rate;
 
@@ -464,7 +544,7 @@ async function mixingDemo() {
     }
   }
 
-  function* whiteNoise(duration) {
+  function* whiteNoise(duration: number) {
     const samples = Math.floor(duration * stream.rate);
 
     for (let i = 0; i < samples; i++) {
@@ -473,7 +553,7 @@ async function mixingDemo() {
   }
 
   // Create mixer and add tracks
-  const mixer = new AudioMixer(stream.rate);
+  const mixer = new AudioMixer();
 
   mixer.addTrack(kickDrum(), { id: "kick", volume: 1.0, pan: 0 });
   mixer.addTrack(sineWave(440, 5), { id: "tone1", volume: 0.5, pan: -0.5 });
@@ -485,33 +565,21 @@ async function mixingDemo() {
 
   console.log("✨ Mixing demo complete!");
 }
-
-mixingDemo().catch(console.error);
 ```
 
 ## Best Practices
 
 ### Avoid Clipping
 
-```javascript
-// Always clamp mixed samples
-yield Math.max(-1, Math.min(1, mixedSample));
+Monitor audio levels and apply soft limiting:
 
-// Or use a soft limiter
-function softLimit(sample, threshold = 0.8) {
-  const abs = Math.abs(sample);
-  if (abs > threshold) {
-    const sign = sample < 0 ? -1 : 1;
-    return sign * (threshold + (abs - threshold) / (1 + (abs - threshold)));
-  }
-  return sample;
-}
-```
+<!-- level-monitoring.mts#level-monitoring -->
 
-### Monitor Levels
-
-```javascript
-function* levelMonitor(generator, callback) {
+```typescript
+function* levelMonitor(
+  generator: Iterable<number>,
+  callback: (levels: { peak: number; rms: number }) => void
+) {
   let peak = 0;
   let rms = 0;
   let sampleCount = 0;
@@ -536,19 +604,42 @@ function* levelMonitor(generator, callback) {
 }
 ```
 
+For additional protection against clipping:
+
+<!-- level-monitoring.mts#soft-limiter -->
+
+```typescript
+function softLimit(sample: number, threshold = 0.8) {
+  const abs = Math.abs(sample);
+  if (abs > threshold) {
+    const sign = sample < 0 ? -1 : 1;
+    return sign * (threshold + (abs - threshold) / (1 + (abs - threshold)));
+  }
+  return sample;
+}
+```
+
 ### Use Appropriate Data Structures
 
-```javascript
-// For real-time mixing, use efficient data structures
+For real-time mixing, use efficient data structures:
+
+<!-- audio-effects.mts#circular-buffer -->
+
+```typescript
 class CircularBuffer {
-  constructor(size) {
+  private buffer: Float32Array;
+  private writeIndex: number;
+  private readIndex: number;
+  private readonly size: number;
+
+  constructor(size: number) {
     this.buffer = new Float32Array(size);
     this.writeIndex = 0;
     this.readIndex = 0;
     this.size = size;
   }
 
-  write(sample) {
+  write(sample: number) {
     this.buffer[this.writeIndex] = sample;
     this.writeIndex = (this.writeIndex + 1) % this.size;
   }
@@ -557,6 +648,16 @@ class CircularBuffer {
     const sample = this.buffer[this.readIndex];
     this.readIndex = (this.readIndex + 1) % this.size;
     return sample;
+  }
+
+  get length() {
+    return this.writeIndex >= this.readIndex
+      ? this.writeIndex - this.readIndex
+      : this.size - (this.readIndex - this.writeIndex);
+  }
+
+  get bufferSize() {
+    return this.size;
   }
 }
 ```
@@ -569,5 +670,29 @@ class CircularBuffer {
 - **Multi-track mixing**: Create full mixer with volume, pan, mute, solo
 - **Effects integration**: Apply effects to individual tracks or master bus
 - **Performance**: Use efficient data structures for real-time applications
+
+## Example Programs
+
+Try these examples to hear different mixing techniques:
+
+```bash
+# Basic mixing techniques
+npx tsx examples/basic-mixing.mts
+
+# Smooth crossfading between waveforms
+npx tsx examples/crossfade-mixing.mts
+
+# Voice-over ducking effect
+npx tsx examples/ducking-mixing.mts
+
+# Stereo panning and effects
+npx tsx examples/stereo-mixer.mts
+
+# Live mixing with dynamic track management
+npx tsx examples/live-mixer.mts
+
+# Level monitoring and soft limiting
+npx tsx examples/level-monitoring.mts
+```
 
 Remember to always keep sample values within the -1.0 to +1.0 range and consider the perceptual aspects of audio mixing for the best results.

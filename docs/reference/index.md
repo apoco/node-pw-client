@@ -4,7 +4,7 @@ Technical specifications and API documentation for the PipeWire Node.js Client.
 
 ## API Documentation
 
-### 📖 [Complete API Reference](api.md)
+### 📖 [Complete API Reference](api/)
 
 Full documentation of all classes, methods, and types.
 
@@ -175,7 +175,7 @@ Memory allocation patterns and optimization.
 
 ### Quick Lookup
 
-- **API method?** → [API Reference](api.md)
+- **API method?** → [API Reference](api/)
 - **Sample values?** → [Audio Sample Formats](audio-samples.md)
 - **Error message?** → [Error Codes](error-codes.md)
 - **Quality setting?** → [Quality Level Specifications](quality-levels.md)

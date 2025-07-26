@@ -1,4 +1,4 @@
-import { startSession, AudioQuality } from "../lib/index.mjs";
+import { startSession, AudioQuality } from "pw-client";
 
 await using session = await startSession();
 
@@ -13,7 +13,7 @@ await using stream = await session.createAudioOutputStream({
 
 stream.on("formatChange", (format) => {
   console.log(
-    `🎵 Format: ${format.format} @ ${format.rate}Hz, ${format.channels} channels`
+    `🎵 Format: ${JSON.stringify(format.format)} @ ${format.rate}Hz, ${format.channels} channels`,
   );
 });
 
@@ -32,7 +32,7 @@ function* generateTone(frequency: number, volume: number, duration: number) {
   let phase = 0;
 
   console.log(
-    `   ${frequency}Hz at ${Math.round(volume * 100)}% volume (range: ${-volume.toFixed(2)} to +${volume.toFixed(2)})`
+    `   ${frequency}Hz at ${Math.round(volume * 100)}% volume (range: ${(-volume).toFixed(2)} to +${volume.toFixed(2)})`,
   );
 
   for (let i = 0; i < samples; i += 2) {
@@ -60,7 +60,7 @@ function* generateWaveform(
   waveType: string,
   frequency: number,
   volume: number,
-  duration: number
+  duration: number,
 ) {
   const samples = Math.floor(duration * rate * 2);
   const cycle = (Math.PI * 2) / rate;
@@ -108,7 +108,7 @@ console.log("• 0.0 = silence, ±1.0 = maximum safe amplitude");
 console.log("• Volume control = multiply by fraction (0.1 = 10% volume)");
 console.log("• Values outside ±1.0 will be clipped (causing distortion)");
 console.log(
-  "• Use lower volumes when mixing multiple sources to prevent clipping"
+  "• Use lower volumes when mixing multiple sources to prevent clipping",
 );
 
 await stream.isFinished();

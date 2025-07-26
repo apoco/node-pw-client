@@ -1,5 +1,5 @@
 import { endianness } from "node:os";
-import {
+import type {
   TypedNumericArray,
   TypedNumericArrayCtor,
 } from "./audio-output-stream.mjs";
@@ -83,13 +83,30 @@ const Uint32Buffer = intOutputBuffer(Uint32Array, unsignedInt(32));
 const Float32Buffer = fpOutputBuffer(Float32Array);
 const Float64Buffer = fpOutputBuffer(Float64Array);
 
+/**
+ * Audio format class representing different sample formats supported by PipeWire.
+ * Handles conversion between JavaScript Numbers and various binary audio formats.
+ *
+ * Users typically don't need to work with AudioFormat directly - it's handled
+ * internally through quality presets and format negotiation.
+ *
+ * @class AudioFormat
+ *
+ * @example
+ * ```typescript
+ * // Access negotiated format info
+ * console.log(`Stream format: ${stream.format.description}`);
+ * console.log(`Sample rate: ${stream.rate}Hz`);
+ * console.log(`Channels: ${stream.channels}`);
+ * ```
+ */
 export class AudioFormat {
-  #enumValue: number;
-  #byteSize: number;
-  #bufferFactory: OutputBufferFactory;
-  #description: string;
+  readonly #enumValue: number;
+  readonly #byteSize: number;
+  readonly #bufferFactory: OutputBufferFactory;
+  readonly #description: string;
 
-  constructor(
+  private constructor(
     value: number,
     byteSize: number,
     BufferClass: OutputBufferFactory,
@@ -118,7 +135,7 @@ export class AudioFormat {
     return this.#description;
   }
 
-  static #enumMap = new Map<number, AudioFormat>();
+  static readonly #enumMap = new Map<number, AudioFormat>();
 
   static fromEnum(format: number) {
     return AudioFormat.#enumMap.get(format);
@@ -249,73 +266,73 @@ export class AudioFormat {
   );
 
   // Endian-specific
-  private static Int16LE = new AudioFormat(
+  private static readonly Int16LE = new AudioFormat(
     0x103,
     2,
     Int16Buffer,
     "16-bit signed integer (standard quality)"
   );
-  private static Int16BE = new AudioFormat(
+  private static readonly Int16BE = new AudioFormat(
     0x104,
     2,
     Int16Buffer,
     "16-bit signed integer (standard quality)"
   );
-  private static Uint16LE = new AudioFormat(
+  private static readonly Uint16LE = new AudioFormat(
     0x105,
     2,
     Uint16Buffer,
     "16-bit unsigned integer (standard quality)"
   );
-  private static Uint16BE = new AudioFormat(
+  private static readonly Uint16BE = new AudioFormat(
     0x106,
     2,
     Uint16Buffer,
     "16-bit unsigned integer (standard quality)"
   );
-  private static Int24_32LE = new AudioFormat(
+  private static readonly Int24_32LE = new AudioFormat(
     0x107,
     4,
     Int32Buffer,
     "24-bit in 32-bit container (professional quality)"
   );
-  private static Int24_32BE = new AudioFormat(
+  private static readonly Int24_32BE = new AudioFormat(
     0x108,
     4,
     Int32Buffer,
     "24-bit in 32-bit container (professional quality)"
   );
-  private static Uint24_32LE = new AudioFormat(
+  private static readonly Uint24_32LE = new AudioFormat(
     0x109,
     4,
     Uint32Buffer,
     "24-bit unsigned in 32-bit container (professional quality)"
   );
-  private static Uint24_32BE = new AudioFormat(
+  private static readonly Uint24_32BE = new AudioFormat(
     0x10a,
     4,
     Uint32Buffer,
     "24-bit unsigned in 32-bit container (professional quality)"
   );
-  private static Int32LE = new AudioFormat(
+  private static readonly Int32LE = new AudioFormat(
     0x10b,
     4,
     Int32Buffer,
     "32-bit signed integer (high precision)"
   );
-  private static Int32BE = new AudioFormat(
+  private static readonly Int32BE = new AudioFormat(
     0x10c,
     4,
     Int32Buffer,
     "32-bit signed integer (high precision)"
   );
-  private static Uint32LE = new AudioFormat(
+  private static readonly Uint32LE = new AudioFormat(
     0x10d,
     4,
     Uint32Buffer,
     "32-bit unsigned integer (high precision)"
   );
-  private static Uint32BE = new AudioFormat(
+  private static readonly Uint32BE = new AudioFormat(
     0x10e,
     4,
     Uint32Buffer,
@@ -333,25 +350,25 @@ export class AudioFormat {
   // private static Int18BE = new AudioFormat(0x118, 3); // No idea...
   // private static Uint18LE = new AudioFormat(0x119, 3); // No idea...
   // private static Uint18BE = new AudioFormat(0x11a, 3); // No idea...
-  private static Float32LE = new AudioFormat(
+  private static readonly Float32LE = new AudioFormat(
     0x11b,
     4,
     Float32Buffer,
     "32-bit floating point (excellent quality)"
   );
-  private static Float32BE = new AudioFormat(
+  private static readonly Float32BE = new AudioFormat(
     0x11c,
     4,
     Float32Buffer,
     "32-bit floating point (excellent quality)"
   );
-  private static Float64LE = new AudioFormat(
+  private static readonly Float64LE = new AudioFormat(
     0x11d,
     8,
     Float64Buffer,
     "64-bit floating point (highest precision)"
   );
-  private static Float64BE = new AudioFormat(
+  private static readonly Float64BE = new AudioFormat(
     0x11e,
     8,
     Float64Buffer,

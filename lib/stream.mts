@@ -1,14 +1,14 @@
-export type Latency = {
+export interface Latency {
   direction: "input" | "output";
   min: LatencyExtrema;
   max: LatencyExtrema;
-};
+}
 
-type LatencyExtrema = {
+interface LatencyExtrema {
   quantum: number;
   rate: number;
-  nanoseconds: BigInt;
-};
+  nanoseconds: bigint;
+}
 
 export enum StreamStateEnum {
   Error = -1,

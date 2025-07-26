@@ -2,30 +2,6 @@
 
 Welcome! This tutorial will guide you through creating your first PipeWire audio application. By the end, you'll have a working program that plays a simple tone through your speakers.
 
-## Node.js Version Compatibility
-
-This tutorial shows manual cleanup patterns compatible with **Node.js 22 LTS**. If you're using **Node.js 24+**, you can use the shorter `await using` syntax instead:
-
-```javascript
-// Node.js 24+ (automatic cleanup)
-await using session = await startSession();
-await using stream = await session.createAudioOutputStream(options);
-// Resources automatically cleaned up
-
-// Node.js 22 LTS (manual cleanup - shown in examples below)
-const session = await startSession();
-try {
-  const stream = await session.createAudioOutputStream(options);
-  try {
-    // Use stream...
-  } finally {
-    await stream.dispose();
-  }
-} finally {
-  await session.dispose();
-}
-```
-
 ## What You'll Learn
 
 - How to set up a PipeWire session
@@ -33,14 +9,21 @@ try {
 - How to generate and play audio samples
 - How to properly clean up resources
 
+> **💡 Try the Complete Example**: All code in this tutorial is available as a runnable example at [`examples/getting-started.mts`](../../examples/getting-started.mts). You can run it with:
+>
+> ```bash
+> npx tsx examples/getting-started.mts
+> ```
+
 ## Prerequisites
 
 Before starting, make sure you have:
 
-- Linux system with PipeWire installed and running
-- Node.js 22+ installed
+- A Linux system
+- PipeWire installed and running
+- Node.js 22+
+- A code editor
 - Basic knowledge of JavaScript/TypeScript
-- A code editor (VS Code recommended)
 
 ## Step 1: Project Setup
 
@@ -58,7 +41,7 @@ Install the PipeWire client library:
 npm install pw-client
 ```
 
-Update `package.json` so ES modules are enabled:
+Update `package.json` so ES modules are enabled, and create a `start` script:
 
 ```json
 {
@@ -73,26 +56,19 @@ Update `package.json` so ES modules are enabled:
 
 Create `index.mjs` with the following code:
 
-```javascript
+<!-- getting-started.mts#complete-example -->
+
+```typescript
 import { startSession, AudioQuality } from "pw-client";
 
-// Main function to keep things organized
 async function playTone() {
-  // Step 1: Create a PipeWire session
-  // For Node.js 24+ (with explicit resource management):
-  // await using session = await startSession();
-
-  // For Node.js 22 LTS (manual cleanup):
+  // Create a PipeWire session
   const session = await startSession();
 
   try {
     console.log("✅ Connected to PipeWire");
 
-    // Step 2: Create an audio output stream
-    // For Node.js 24+ (with explicit resource management):
-    // await using stream = await session.createAudioOutputStream({
-
-    // For Node.js 22 LTS (manual cleanup):
+    // Create an audio output stream
     const stream = await session.createAudioOutputStream({
       name: "My First Audio App", // Friendly name for PipeWire
       quality: AudioQuality.Standard, // Good balance of quality/performance
@@ -100,14 +76,14 @@ async function playTone() {
     });
 
     try {
-      // Step 3: Connect to the audio system
+      // Connect to the audio system
       await stream.connect();
       console.log(
         `🔊 Stream connected: ${stream.format.description} @ ${stream.rate}Hz`
       );
 
-      // Step 4: Generate a simple tone
-      function* generateTone(frequency, duration) {
+      // Generate a simple tone
+      function* generateTone(frequency: number, duration: number) {
         const totalSamples = Math.floor(
           duration * stream.rate * stream.channels
         );
@@ -126,17 +102,17 @@ async function playTone() {
         }
       }
 
-      // Step 5: Play the tone
+      // Play the tone
       console.log("🎵 Playing 440Hz tone for 2 seconds...");
       await stream.write(generateTone(440, 2.0)); // A4 note for 2 seconds
 
       console.log("✨ Done!");
     } finally {
-      // Clean up the stream (required for Node.js 22)
+      // Clean up the stream
       await stream.dispose();
     }
   } finally {
-    // Clean up the session (required for Node.js 22)
+    // Clean up the session
     await session.dispose();
   }
 }
@@ -159,22 +135,38 @@ Let's break down the key concepts:
 
 ### 1. Session Management
 
-```javascript
-await using session = await startSession();
+<!-- getting-started.mts#session-management -->
+
+```typescript
+  // Create a PipeWire session
+  const session = await startSession();
+
+  try {
+    console.log("✅ Connected to PipeWire");
 ```
 
 - Creates a connection to the PipeWire audio system
-- `await using` ensures automatic cleanup when the block exits
 - Sessions manage all your audio streams
+- Must be cleaned up with `await session.dispose()`
 
 ### 2. Stream Creation
 
-```javascript
-await using stream = await session.createAudioOutputStream({
-  name: "My First Audio App",
-  quality: AudioQuality.Standard,
-  channels: 2,
-});
+<!-- getting-started.mts#stream-creation -->
+
+```typescript
+    // Create an audio output stream
+    const stream = await session.createAudioOutputStream({
+      name: "My First Audio App", // Friendly name for PipeWire
+      quality: AudioQuality.Standard, // Good balance of quality/performance
+      channels: 2, // Stereo output
+    });
+
+    try {
+      // Connect to the audio system
+      await stream.connect();
+      console.log(
+        `🔊 Stream connected: ${stream.format.description} @ ${stream.rate}Hz`
+      );
 ```
 
 - Creates an audio output stream with specified properties
@@ -183,12 +175,34 @@ await using stream = await session.createAudioOutputStream({
 
 ### 3. Audio Generation
 
-```javascript
-function* generateTone(frequency, duration) {
-  // Generator function yields samples one by one
-  const sample = Math.sin(phase * frequency) * 0.2;
-  yield sample; // Always between -1.0 and +1.0
-}
+<!-- getting-started.mts#audio-generation -->
+
+```typescript
+      // Generate a simple tone
+      function* generateTone(frequency: number, duration: number) {
+        const totalSamples = Math.floor(
+          duration * stream.rate * stream.channels
+        );
+        const cycle = (Math.PI * 2) / stream.rate;
+        let phase = 0;
+
+        for (let i = 0; i < totalSamples; i += stream.channels) {
+          // Create the sine wave sample (range: -1.0 to +1.0)
+          const sample = Math.sin(phase * frequency) * 0.2; // 20% volume
+
+          // Output to both stereo channels
+          yield sample; // Left channel
+          yield sample; // Right channel
+
+          phase += cycle;
+        }
+      }
+
+      // Play the tone
+      console.log("🎵 Playing 440Hz tone for 2 seconds...");
+      await stream.write(generateTone(440, 2.0)); // A4 note for 2 seconds
+
+      console.log("✨ Done!");
 ```
 
 - Generator functions provide memory-efficient audio streaming
@@ -197,13 +211,22 @@ function* generateTone(frequency, duration) {
 
 ### 4. Resource Cleanup
 
-```javascript
-await using stream = // ...
+<!-- getting-started.mts#resource-cleanup -->
+
+```typescript
+    } finally {
+      // Clean up the stream
+      await stream.dispose();
+    }
+  } finally {
+    // Clean up the session
+    await session.dispose();
+  }
 ```
 
-- `await using` automatically closes streams and sessions
-- No manual cleanup needed - prevents resource leaks
-- Modern JavaScript resource management
+- Always clean up streams and sessions to prevent resource leaks
+- Use `try/finally` blocks to ensure cleanup happens even if errors occur
+- For easier cleanup options with Node.js 24+, see [Resource Management](../explanation/resource-management.md)
 
 ## Next Steps
 
@@ -226,4 +249,4 @@ Congratulations! You've created your first PipeWire audio application. Here's wh
 - Install PipeWire development headers: `sudo apt install libpipewire-0.3-dev`
 - Make sure you have build tools: `sudo apt install build-essential`
 
-**Need help?** Check the [API Reference](../reference/api.md) or [How-to Guides](../how-to-guides/) for more detailed information.
+**Need help?** Check the [API Reference](../reference/api/) or [How-to Guides](../how-to-guides/) for more detailed information.

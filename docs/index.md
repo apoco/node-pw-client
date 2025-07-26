@@ -22,7 +22,7 @@ Practical recipes for common audio programming tasks.
 
 Complete API documentation and technical specifications.
 
-- **[API Reference](reference/api.md)** - Complete class and method documentation
+- **[API Reference](reference/api/)** - Complete class and method documentation
 - **[Audio Sample Formats](reference/audio-samples.md)** - Sample value ranges and formats
 - **[Quality Level Specifications](reference/quality-levels.md)** - Technical details of each quality level
 
@@ -42,7 +42,7 @@ Background knowledge and design decisions.
 
 **Need to solve a specific problem?** → Browse [How-to Guides](how-to-guides/)
 
-**Looking for API details?** → Check the [API Reference](reference/api.md)
+**Looking for API details?** → Check the [API Reference](reference/api/)
 
 **Want to understand the design?** → Read [Architecture Overview](explanation/architecture.md)
 

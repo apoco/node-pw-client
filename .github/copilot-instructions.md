@@ -1,31 +1,96 @@
 # PipeWire Node.js Project Instructions
 
-Key documentation to read before getting started:
+## 🚀 Quick Start Checklist
 
-- [Project README](../README.md) for details on this project
-- [Coding standards](../docs/explanation/coding-standards.md)
+- [ ] Check `PROGRESS.md` for current work status
+- [ ] Read [coding standards](../docs/explanation/coding-standards.md) for style requirements
+- [ ] Use `.snippets/` for any code that goes in documentation
+- [ ] Run `npm run docs:generate` after documentation changes
+- [ ] Test examples with `npx tsx examples/<filename>`
 
-## 🤖 AI Assistant Workflow
+## 🔧 Core Workflow
 
-To keep track of work, check `PROGRESS.md` on startup and update it as we go. It should have a succinct description of what we're doing and a checklist of work items. Check items once they've been completed, and add new work items as you go. I'll delete the file once a particular feature/bugfix has been committed.
+### New Feature Development
 
-When `PROGRESS.md` is blank (we're starting a new bit of work):
+1. **Validate idea** - Present alternatives and ecosystem context
+2. **Documentation first** - Update docs as if feature exists (validates UX)
+3. **Example creation** - Write working examples in `.snippets/`
+4. **Review cycle** - Let user validate approach before coding
+5. **Implementation** - Code to match the documented API
+6. **Testing** - Use examples to verify functionality
 
-1. Consider if the prompted idea is a good one; present alternatives, potential gotchas, and information on the state of the art from the wider ecosystem.
-1. Once we've confirmed a plan of action, update the documentation as though the change has already been implemented (unless it's just a bug fix, refactoring, or other things the _end user_ doesn't care about). That should help us validate the developer experience so we can decide if that's really how we want to go about things.
-1. Write or update at least one example demonstrating the new feature. It's ok if the example code doesn't work; we just want to see what it looks like.
-1. Allow me to review the docs and example to make sure we're taking the desired approach and refine the idea further if not.
-1. Begin the coding.
-1. Use the examples for testing your work (for now... unit tests may be added in the future).
+### Documentation Updates
 
-Whenever I express a new coding preference or design guideline, updating the documentation so that you'll follow that principal in future sessions.
+- **Source files**: Always edit `.snippets/` never `examples/`
+- **Generation**: Run `npm run docs:generate` after changes
+- **API Documentation**: Add JSDoc comments to all public API, run `npm run docs:api`
+- **Framework**: Use [Diátaxis](../docs/how-to-guides/author-documentation.md) (tutorial/how-to/reference/explanation)
+- **Validation**: Ensure generated examples are runnable
 
-## Technical notes
+### Code Quality Standards
 
-### Issues with the terminal
+- **TypeScript**: No `any`, loose types, or `@ts-ignore` - ask for help instead
+- **Functions**: ~40 line limit, extract helpers for clarity
+- **Resources**: Use RAII patterns, explicit cleanup
+- **Performance**: Optimize audio-critical paths, minimize allocations
+- **JSDoc**: REQUIRED for all public API elements, generates docs automatically
 
-The `run_in_terminal` tool sometimes fails to capture the command output. If that happens, use the `get_terminal_last_command` tool to retrieve the last command output from the terminal. If that fails, ask the user to copy-paste the output from the terminal.
+## 🛠️ Technical Patterns
 
-### TypeScript struggles
+### File Structure
 
-Sometimes you or other agents struggle with TypeScript; don't give up and cast to `any`, use loose types, or use `// @ts-ignore` if you think you need to resort to a shortcut like this, pause and ask for help first.
+```
+.snippets/     # Source files with SNIP markers (edit these)
+examples/      # Generated clean files (don't edit)
+docs/          # Documentation with snippet placeholders
+lib/           # TypeScript API layer
+src/           # C++ implementation
+```
+
+### Import Style
+
+```typescript
+// ✅ Use package imports in examples
+import { startSession } from "pw-client";
+
+// ❌ Don't use relative imports in docs
+import { startSession } from "../lib/index.mjs";
+```
+
+### Resource Management
+
+```typescript
+// ✅ Explicit cleanup (Node.js 22+)
+const session = await startSession();
+try {
+  // use session
+} finally {
+  await session.dispose();
+}
+
+// ✅ Automatic cleanup (Node.js 24+)
+await using session = await startSession();
+```
+
+## 🐛 Common Issues
+
+### Terminal Commands
+
+- `run_in_terminal` may not capture output → use `get_terminal_last_command`
+- If that fails → ask user to copy-paste terminal output
+
+### Build System
+
+- Native build: `npm run build:native:debug && npx tsc`
+- Doc generation: `npm run docs:generate`
+- Example testing: `npx tsx examples/<file>`
+
+### Project Tracking
+
+- Update `PROGRESS.md` with work items and status
+- Check items as completed, add new items as discovered
+- User deletes file when feature/fix is committed
+
+---
+
+**📖 Comprehensive guides:** [Documentation authoring](../docs/how-to-guides/author-documentation.md) | [Architecture](../docs/explanation/architecture.md) | [Coding standards](../docs/explanation/coding-standards.md)

@@ -4,7 +4,7 @@ Different applications have different audio quality requirements. This guide hel
 
 ## Quick Decision Guide
 
-```javascript
+```typescript
 // High-fidelity music applications
 quality: AudioQuality.High;
 
@@ -39,7 +39,7 @@ _Note: Higher sample rates and bit depths require more memory bandwidth and proc
 
 **Why High quality:**
 
-```javascript
+```typescript
 const stream = await session.createAudioOutputStream({
   name: "Professional Audio",
   quality: AudioQuality.High, // Maximum precision
@@ -67,7 +67,7 @@ const stream = await session.createAudioOutputStream({
 
 **Why Standard quality:**
 
-```javascript
+```typescript
 const stream = await session.createAudioOutputStream({
   name: "Music Player",
   quality: AudioQuality.Standard, // Good balance
@@ -95,7 +95,7 @@ const stream = await session.createAudioOutputStream({
 
 **Why Efficient quality:**
 
-```javascript
+```typescript
 const stream = await session.createAudioOutputStream({
   name: "System Notifications",
   quality: AudioQuality.Efficient, // Minimal resources
@@ -115,7 +115,7 @@ const stream = await session.createAudioOutputStream({
 
 ### Music Production Application
 
-```javascript
+```typescript
 // High quality for critical audio work
 await using session = await startSession();
 await using stream = await session.createAudioOutputStream({
@@ -133,7 +133,7 @@ console.log(
 
 ### Game Audio Engine
 
-```javascript
+```typescript
 // Standard quality for game audio
 await using session = await startSession();
 
@@ -156,7 +156,7 @@ await using sfxStream = await session.createAudioOutputStream({
 
 ### System Integration
 
-```javascript
+```typescript
 // Efficient quality for system sounds
 await using session = await startSession();
 await using notificationStream = await session.createAudioOutputStream({
@@ -185,7 +185,7 @@ await notificationStream.write(beep());
 
 Choose quality based on runtime conditions:
 
-```javascript
+```typescript
 function selectQuality(context) {
   // Check system capabilities
   const isLowPowerDevice = process.arch === "arm" || process.arch === "arm64";
@@ -226,7 +226,7 @@ await using stream = await session.createAudioOutputStream({
 
 Check what format was actually negotiated:
 
-```javascript
+```typescript
 await using stream = await session.createAudioOutputStream({
   name: "Quality Test",
   quality: AudioQuality.High,
@@ -254,7 +254,7 @@ if (!isHighQuality) {
 
 Measure the impact of different quality levels:
 
-```javascript
+```typescript
 async function benchmarkQuality(quality, testDuration = 5.0) {
   const startTime = process.hrtime.bigint();
 
@@ -313,7 +313,7 @@ for (const quality of qualities) {
 
 ### ❌ Don't always use High quality
 
-```javascript
+```typescript
 // Wrong: Unnecessarily high quality for notifications
 await session.createAudioOutputStream({
   quality: AudioQuality.High, // Overkill!
@@ -321,7 +321,7 @@ await session.createAudioOutputStream({
 });
 ```
 
-```javascript
+```typescript
 // Right: Appropriate quality for use case
 await session.createAudioOutputStream({
   quality: AudioQuality.Efficient, // Perfect for notifications
@@ -331,7 +331,7 @@ await session.createAudioOutputStream({
 
 ### ❌ Don't ignore the negotiated format
 
-```javascript
+```typescript
 // Wrong: Assuming format without checking
 await stream.connect();
 // Assuming we got Float64...
@@ -343,7 +343,7 @@ console.log(`Actually got: ${stream.format.description}`);
 
 ### ❌ Don't use fixed quality for all users
 
-```javascript
+```typescript
 // Wrong: Same quality for all users
 const quality = AudioQuality.High;
 

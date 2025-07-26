@@ -1,35 +1,32 @@
-import { startSession, AudioQuality } from "../lib/index.mjs";
+import { startSession, AudioQuality } from "pw-client";
+
+function* generateStereoNoise(
+  durationSeconds: number,
+  sampleRate: number,
+  volume = 0.5,
+) {
+  const totalSamples = durationSeconds * sampleRate * 2; // 2 channels
+
+  for (let i = 0; i < totalSamples; i += 2) {
+    // Generate independent random noise for each channel
+    for (let ch = 0; ch < 2; ch++) {
+      const sample = (Math.random() - 0.5) * volume;
+      yield sample;
+    }
+  }
+}
 
 await using session = await startSession();
 
 await using stream = await session.createAudioOutputStream({
   name: "Stereo Noise Demo",
-  quality: AudioQuality.Standard, // Good balance for demos - auto-negotiates rate!
+  quality: AudioQuality.Standard,
   channels: 2, // Stereo for proper playback in both ears
-  role: "Music", // For proper audio routing
+  autoConnect: true,
 });
-
-stream.on("formatChange", (format) => {
-  console.log(
-    `🎵 Quality: ${AudioQuality.Standard} → Format: ${format.format.description} @ ${format.rate}Hz`
-  );
-});
-
-await stream.connect();
 
 await stream.write(
-  (function* sampleStream() {
-    // Use negotiated stream properties
-    for (
-      let i = 0;
-      i < 4 * stream.rate * stream.channels;
-      i += stream.channels
-    ) {
-      // Generate random noise for each channel
-      for (let ch = 0; ch < stream.channels; ch++) {
-        const sample = (Math.random() - 0.5) * 0.5; // Range: -0.25 to +0.25 (50% volume)
-        yield sample;
-      }
-    }
-  })()
+  generateStereoNoise(4.0, stream.rate, 0.5), // 4 seconds of stereo noise at 50% volume
 );
+
+console.log("🎵 Stereo noise demo complete!");

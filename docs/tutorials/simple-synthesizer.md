@@ -19,20 +19,23 @@ A command-line synthesizer that can:
 
 ## Step 1: Basic Synthesizer Structure
 
-Create `synthesizer.mjs`:
+Here's the complete synthesizer class that handles note-to-frequency conversion, waveform generation, and audio playback:
 
-```javascript
-import { startSession, AudioQuality } from "pw-client";
+<!-- simple-synth-class.mts#simple-synth-class -->
 
-class SimpleSynth {
-  constructor(stream) {
+```typescript
+export class SimpleSynth {
+  public stream: AudioOutputStream;
+  public volume: number;
+
+  constructor(stream: AudioOutputStream) {
     this.stream = stream;
     this.volume = 0.3; // Default volume (30%)
   }
 
   // Convert musical note to frequency
-  noteToFrequency(note, octave = 4) {
-    const notes = {
+  noteToFrequency(note: string, octave = 4) {
+    const notes: Record<string, number> = {
       C: -9,
       "C#": -8,
       Db: -8,
@@ -62,7 +65,7 @@ class SimpleSynth {
   }
 
   // Generate different waveforms
-  *generateWave(type, frequency, duration) {
+  *generateWave(type: string, frequency: number, duration: number) {
     const sampleRate = this.stream.rate;
     const channels = this.stream.channels;
     const totalSamples = Math.floor(duration * sampleRate * channels);
@@ -86,10 +89,11 @@ class SimpleSynth {
           sample = 2 * (((phase * frequency) / (Math.PI * 2)) % 1) - 1;
           break;
 
-        case "triangle":
+        case "triangle": {
           const t = ((phase * frequency) / (Math.PI * 2)) % 1;
           sample = t < 0.5 ? 4 * t - 1 : 3 - 4 * t;
           break;
+        }
 
         default:
           throw new Error(`Unknown waveform: ${type}`);
@@ -106,7 +110,12 @@ class SimpleSynth {
   }
 
   // Play a musical note
-  async playNote(note, octave, duration, waveform = "sine") {
+  async playNote(
+    note: string,
+    octave: number,
+    duration: number,
+    waveform = "sine"
+  ) {
     const frequency = this.noteToFrequency(note, octave);
     console.log(
       `🎵 Playing ${note}${octave} (${frequency.toFixed(1)}Hz) - ${waveform} for ${duration}s`
@@ -116,14 +125,21 @@ class SimpleSynth {
   }
 
   // Play a sequence of notes
-  async playSequence(sequence) {
+  async playSequence(
+    sequence: Array<{
+      note: string;
+      octave: number;
+      duration: number;
+      waveform: string;
+    }>
+  ) {
     for (const { note, octave, duration, waveform } of sequence) {
       await this.playNote(note, octave, duration, waveform);
     }
   }
 
   // Add some silence
-  async addSilence(duration) {
+  async addSilence(duration: number) {
     const sampleRate = this.stream.rate;
     const channels = this.stream.channels;
     const totalSamples = Math.floor(duration * sampleRate * channels);
@@ -136,9 +152,50 @@ class SimpleSynth {
 
     await this.stream.write(silence());
   }
-}
 
-// Main demo function
+  // Play chord by mixing frequencies
+  async playChord(notes: Array<string>, octave: number, duration: number) {
+    const frequencies = notes.map((note) => this.noteToFrequency(note, octave));
+
+    const sampleRate = this.stream.rate;
+    const channels = this.stream.channels;
+    const totalSamples = Math.floor(duration * sampleRate * channels);
+
+    const cycle = (Math.PI * 2) / sampleRate;
+    let phase = 0;
+
+    const that = this;
+    function* generateChord() {
+      for (let i = 0; i < totalSamples; i += channels) {
+        // Mix all frequencies together
+        let sample = 0;
+        for (const freq of frequencies) {
+          sample += Math.sin(phase * freq);
+        }
+        sample = (sample / frequencies.length) * that.volume; // Average and apply volume
+
+        for (let ch = 0; ch < channels; ch++) {
+          yield sample;
+        }
+        phase += cycle;
+      }
+    }
+
+    console.log(
+      `🎼 Playing chord: ${notes.join("-")}${octave} for ${duration}s`
+    );
+    await this.stream.write(generateChord());
+  }
+}
+```
+
+## Step 2: Demo Program
+
+Here's a complete demo that showcases the synthesizer capabilities:
+
+<!-- simple-synthesizer.mts#main-demo -->
+
+```typescript
 async function synthDemo() {
   const session = await startSession();
 
@@ -209,10 +266,10 @@ async function synthDemo() {
 synthDemo().catch(console.error);
 ```
 
-## Step 2: Run Your Synthesizer
+## Step 3: Run Your Synthesizer
 
 ```bash
-node synthesizer.mjs
+npx tsx examples/simple-synthesizer.mts
 ```
 
 You'll hear a sequence of sounds demonstrating different waveforms, a simple melody, and volume control.
@@ -221,15 +278,56 @@ You'll hear a sequence of sounds demonstrating different waveforms, a simple mel
 
 ### 1. Note-to-Frequency Conversion
 
-```javascript
-noteToFrequency(note, octave = 4) {
-  const notes = { 'A': 0, 'B': 2, 'C': -9, /* ... */ };
-  const semitone = notes[note];
-  return 440 * Math.pow(2, (octave - 4) + semitone / 12);
-}
+<!-- simple-synth-class.mts#note-to-frequency -->
+
+```typescript
+  // Convert musical note to frequency
+  noteToFrequency(note: string, octave = 4) {
+    const notes: Record<string, number> = {
+      C: -9,
+      "C#": -8,
+      Db: -8,
+      D: -7,
+      "D#": -6,
+      Eb: -6,
+      E: -5,
+      F: -4,
+      "F#": -3,
+      Gb: -3,
+      G: -2,
+      "G#": -1,
+      Ab: -1,
+      A: 0,
+      "A#": 1,
+      Bb: 1,
+      B: 2,
+    };
+
+    const semitone = notes[note];
+    if (semitone === undefined) {
+      throw new Error(`Unknown note: ${note}`);
+    }
+
+    // A4 = 440Hz, each octave doubles/halves frequency
+    return 440 * Math.pow(2, octave - 4 + semitone / 12);
+  }
 ```
 
 This converts musical notes (like "A4" or "C5") to frequencies in Hz using the equal temperament tuning system.
+
+### 2. Waveform Generation
+
+Different waveforms create different timbres:
+
+- **Sine wave**: Pure tone, smooth sound
+- **Square wave**: Harsh, electronic sound
+- **Sawtooth wave**: Bright, buzzy sound
+
+## Key Concepts Explained
+
+### 1. Note-to-Frequency Conversion
+
+The synthesizer converts musical notes to frequencies using equal temperament tuning, where A4 = 440Hz and each octave doubles or halves the frequency.
 
 ### 2. Waveform Generation
 
@@ -242,69 +340,37 @@ Different waveforms create different timbres:
 
 ### 3. Generator Functions for Audio
 
-```javascript
-*generateWave(type, frequency, duration) {
-  for (let i = 0; i < totalSamples; i += channels) {
-    let sample = /* calculate waveform */;
-    yield sample; // Left channel
-    yield sample; // Right channel (stereo)
-  }
-}
-```
+Generator functions provide efficient streaming of audio samples without loading everything into memory at once, yielding samples one at a time as needed.
 
-Generator functions provide efficient streaming of audio samples without loading everything into memory at once.
+## Step 4: Interactive Synthesizer
 
-## Step 3: Interactive Synthesizer
+The example also includes an interactive mode where you can play notes in real-time:
 
-Let's make it interactive! Create `interactive-synth.mjs`:
+<!-- interactive-synthesizer.mts#interactive-synth -->
 
-```javascript
+```typescript
 import { startSession, AudioQuality } from "pw-client";
-import { createInterface } from "readline";
+import { createInterface } from "readline/promises";
 
-// ... (include the SimpleSynth class from above)
+// Import the SimpleSynth class from the class module
+import { SimpleSynth } from "./simple-synth-class.mjs";
 
 async function interactiveSynth() {
-  const session = await startSession();
-  const stream = await session.createAudioOutputStream({
+  await using session = await startSession();
+  await using stream = await session.createAudioOutputStream({
     name: "Interactive Synthesizer",
     quality: AudioQuality.Standard,
     channels: 2,
   });
 
   await stream.connect();
-  const synth = new SimpleSynth(stream);
 
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+  // Wait for the interactive loop to complete before exiting
+  await interactiveLoop(new SimpleSynth(stream));
+}
 
-  let isQuitting = false;
-
-  // Setup cleanup when the interface closes
-  rl.on('close', async () => {
-    if (isQuitting) return; // Prevent double cleanup
-    isQuitting = true;
-
-    console.log('\n🧹 Cleaning up...');
-    try {
-      await stream.dispose();
-    } catch (error) {
-      console.error('Error disposing stream:', error);
-    }
-
-    try {
-      await session.dispose();
-    } catch (error) {
-      console.error('Error disposing session:', error);
-    }
-
-    console.log('👋 Goodbye!');
-    process.exit(0);
-  });
-
-      console.log(`
+async function interactiveLoop(synth: SimpleSynth): Promise<void> {
+  console.log(`
 🎹 Interactive Synthesizer Ready!
 
 Commands:
@@ -316,114 +382,96 @@ Commands:
 Example: play C# 5 2.0 square
 `);
 
-      const askCommand = () => {
-        rl.question("🎵 Enter command: ", async (input) => {
-          const parts = input.trim().split(" ");
-          const command = parts[0].toLowerCase();
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  let keepAsking = true;
 
-          try {
-            switch (command) {
-              case "play":
-                if (parts.length < 4) {
-                  console.log(
-                    "Usage: play <note> <octave> <duration> [waveform]"
-                  );
-                  break;
-                }
-                const [, note, octave, duration, waveform = "sine"] = parts;
-                await synth.playNote(
-                  note,
-                  parseInt(octave),
-                  parseFloat(duration),
-                  waveform
-                );
-                break;
+  process.on("SIGINT", () => {
+    console.log("\n🛑 Interrupt received");
+    rl.close();
+    keepAsking = false;
+  });
 
-              case "volume":
-                if (parts.length < 2) {
-                  console.log("Usage: volume <level> (0.0-1.0)");
-                  break;
-                }
-                synth.volume = Math.max(0, Math.min(1, parseFloat(parts[1])));
-                console.log(`🔊 Volume set to ${synth.volume}`);
-                break;
-
-              case "chord":
-                if (parts.length < 5) {
-                  console.log(
-                    "Usage: chord <note1> <note2> <note3> <duration>"
-                  );
-                  break;
-                }
-                const [, note1, note2, note3, chordDuration] = parts;
-                // Play chord by mixing frequencies
-                await synth.playChord(
-                  [note1, note2, note3],
-                  4,
-                  parseFloat(chordDuration)
-                );
-                break;
-
-              case "quit":
-                rl.close();
-                return;
-
-              default:
-                console.log('Unknown command. Type "quit" to exit.');
-            }
-          } catch (error) {
-            console.error("Error:", error.message);
-          }
-
-          askCommand(); // Ask for next command
-        });
-      };
-
-      askCommand();
-
-      // Note: In a real interactive app, you'd want to handle cleanup
-      // when the user exits. For this demo, cleanup happens when the process exits.
-    } finally {
-      await stream.dispose(); // Clean up the stream
+  try {
+    while (keepAsking) {
+      const input = await rl.question("🎵 Enter command: ");
+      keepAsking = await handleCommand(input, synth);
     }
-  } finally {
-    await session.dispose(); // Clean up the session
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "name" in err &&
+      err.name !== "AbortError"
+    ) {
+      throw err;
+    }
   }
+
+  rl.close();
 }
 
-// Add chord method to SimpleSynth class
-SimpleSynth.prototype.playChord = function (notes, octave, duration) {
-  const frequencies = notes.map((note) => this.noteToFrequency(note, octave));
+async function handleCommand(
+  input: string,
+  synth: SimpleSynth
+): Promise<boolean> {
+  const parts = input.trim().split(" ");
+  const command = parts[0].toLowerCase();
 
-  const sampleRate = this.stream.rate;
-  const channels = this.stream.channels;
-  const totalSamples = Math.floor(duration * sampleRate * channels);
-
-  const cycle = (Math.PI * 2) / sampleRate;
-  let phase = 0;
-
-  function* generateChord() {
-    for (let i = 0; i < totalSamples; i += channels) {
-      // Mix all frequencies together
-      let sample = 0;
-      for (const freq of frequencies) {
-        sample += Math.sin(phase * freq);
-      }
-      sample = (sample / frequencies.length) * this.volume; // Average and apply volume
-
-      for (let ch = 0; ch < channels; ch++) {
-        yield sample;
-      }
-      phase += cycle;
-    }
+  switch (command) {
+    case "play":
+      await playNote(synth, parts);
+      break;
+    case "volume":
+      setVolume(synth, parts);
+      break;
+    case "chord":
+      await playChord(synth, parts);
+      break;
+    case "quit":
+      return false;
+    default:
+      console.log('Unknown command. Type "quit" to exit.');
   }
 
-  console.log(`🎼 Playing chord: ${notes.join("-")}${octave} for ${duration}s`);
-  return this.stream.write(generateChord.call(this));
-};
+  return true; // Continue asking for commands
+}
 
+async function playNote(synth: SimpleSynth, parts: Array<string>) {
+  if (parts.length < 4) {
+    console.log("Usage: play <note> <octave> <duration> [waveform]");
+    return;
+  }
+  const [, note, octave, duration, waveform = "sine"] = parts;
+  await synth.playNote(note, parseInt(octave), parseFloat(duration), waveform);
+}
+
+function setVolume(synth: SimpleSynth, parts: Array<string>) {
+  if (parts.length < 2) {
+    console.log("Usage: volume <level> (0.0-1.0)");
+    return;
+  }
+  synth.volume = Math.max(0, Math.min(1, parseFloat(parts[1])));
+  console.log(`🔊 Volume set to ${synth.volume}`);
+}
+
+async function playChord(synth: SimpleSynth, parts: Array<string>) {
+  if (parts.length < 5) {
+    console.log("Usage: chord <note1> <note2> <note3> <duration>");
+    return;
+  }
+  const [, note1, note2, note3, chordDuration] = parts;
+  await synth.playChord([note1, note2, note3], 4, parseFloat(chordDuration));
+}
+
+// Run the interactive synthesizer
 interactiveSynth().catch(console.error);
 ```
+
+To use the interactive mode, uncomment the last line in the example file and run it. You can then type commands like:
+
+- `play A 4 2.0 sine` - Play an A4 note for 2 seconds
+- `volume 0.8` - Set volume to 80%
+- `chord C E G 3.0` - Play a C major chord for 3 seconds
 
 ## What You've Learned
 

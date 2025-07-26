@@ -15,8 +15,10 @@ Node.js library for PipeWire audio programming. Build audio applications, synthe
 npm install pw-client
 ```
 
+<!-- quick-start.mts#combined-example -->
+
 ```typescript
-import { startSession, AudioQuality } from "pw-client";
+import { startSession } from "pw-client";
 
 // Create processing thread for PipeWire
 const session = await startSession();
@@ -25,7 +27,6 @@ try {
   // Create audio stream
   const stream = await session.createAudioOutputStream({
     name: "My Audio App",
-    quality: AudioQuality.Standard, // Auto-negotiates optimal format
     channels: 2, // Stereo output
   });
 
@@ -59,6 +60,8 @@ try {
 }
 ```
 
+> **📁 Complete Example**: Run the full example with `npx tsx examples/quick-start.mts`
+
 ## 📚 Documentation
 
 ### 🎓 [Tutorials](docs/tutorials/index.md) - _Learn by doing_
@@ -71,10 +74,11 @@ try {
 
 - **[Choose the Right Audio Quality](docs/how-to-guides/choose-audio-quality.md)** - Match quality to your use case
 - **[Generate Common Waveforms](docs/how-to-guides/generate-waveforms.md)** - Sine, square, sawtooth waves
+- **[Monitor Stream Events](docs/how-to-guides/monitor-stream-events.md)** - Handle connection state and errors
 
 ### 📖 [Reference](docs/reference/) - _Look up technical details_
 
-- **[API Reference](docs/reference/api.md)** - Complete class and method documentation
+- **[API Reference](docs/reference/api/)** - Complete class and method documentation
 - **[Audio Sample Formats](docs/reference/audio-samples.md)** - Sample value ranges and formats
 
 ### 💡 [Explanation](docs/explanation/) - _Understand the concepts_
@@ -88,7 +92,7 @@ try {
 Check out the [`examples/`](examples/) directory for complete working demos. Use `npx tsx` to run them without having to compile:
 
 ```bash
-npx tsx examples/hello-pipewire.mts
+npx tsx examples/getting-started.mts
 ```
 
 ## 📋 Prerequisites
@@ -98,14 +102,13 @@ npx tsx examples/hello-pipewire.mts
 - **Build tools** - GCC, make, Python 3
 - **PipeWire headers** - `libpipewire-0.3-dev` package
 
-> **Note:** The examples above use manual cleanup compatible with Node.js 22 LTS. For Node.js 24+, you can use `await using` for automatic resource management. See the [tutorials](docs/tutorials/) for both patterns.
-
 ## 🤝 Contributing
 
 1. Read [Contributing Guidelines](docs/explanation/contributing.md)
 2. Check [Architecture Overview](docs/explanation/architecture.md)
 3. Follow [Coding Style](docs/explanation/coding-standards.md)
-4. Run examples to test changes
+4. See [Documentation Authoring Guide](docs/how-to-guides/author-documentation.md) for docs/examples
+5. Run examples to test changes
 
 ## 📄 License
 

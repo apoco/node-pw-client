@@ -1,0 +1,24 @@
+{
+  "entryPoints": ["./lib/index.mts"],
+  "tsconfig": "./tsconfig.docs.json",
+  "out": "docs/reference/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "hideGenerator": true,
+  "hideBreadcrumbs": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "excludeNotDocumented": false,
+  "excludeReferences": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Function",
+    "Class", 
+    "Interface",
+    "TypeAlias",
+    "Enum",
+    "Variable"
+  ]
+}

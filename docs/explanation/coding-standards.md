@@ -35,6 +35,23 @@ This file documents my coding preferences, standards, and conventions for this p
 
 ### TypeScript/JavaScript
 
+#### Dead Code Detection
+
+```typescript
+// ✅ Fix dead code by using it or removing it
+function* audioEffectChain(input: Iterable<number>, sampleRate: number) {
+  // Use this function in the main demo or remove it
+  yield* delayEffect(input, 0.1, sampleRate, 0.2, 0.1);
+}
+
+// ❌ Don't hide dead code with underscores
+function* _audioEffectChain(input: Iterable<number>, sampleRate: number) {
+  // This defeats the purpose of dead code detection
+}
+```
+
+**Important**: Never use underscore prefixes to silence dead code warnings. Dead code detection helps ensure all documented code is actually tested and works. Either use the code in examples or remove it entirely.
+
 #### Type Safety
 
 ```typescript
@@ -308,10 +325,38 @@ npx tsc --noEmit
 
 ### Comments
 
-#### For end-users
+#### For end-users (JSDoc Comments)
 
-- **JSDocs for the public interface**; if it's not public don't bother with jsdocs.
-- **Keep it succinct**; link to documentation files for long-form explanations
+- **JSDoc is REQUIRED for all public API elements**; this generates the API reference automatically
+- **Never manually edit `docs/reference/api/`**; it's auto-generated from JSDoc comments
+- **Include comprehensive examples** in JSDoc `@example` tags
+- **Document all parameters, returns, and throws** with proper JSDoc tags
+- **Keep JSDoc up-to-date** when changing function signatures or behavior
+- **Use `@internal` tag** to exclude implementation details from public docs
+
+````typescript
+// ✅ Comprehensive JSDoc for public API
+/**
+ * Creates a new audio output stream.
+ *
+ * @param opts - Stream configuration options (all optional)
+ * @returns Promise resolving to AudioOutputStream instance
+ * @throws Will reject if session is disposed or stream creation fails
+ *
+ * @example
+ * ```typescript
+ * const stream = await session.createAudioOutputStream({
+ *   name: "My Audio App",
+ *   quality: AudioQuality.Standard,
+ *   channels: 2
+ * });
+ * ```
+ */
+createAudioOutputStream(opts?: AudioOutputStreamOpts): Promise<AudioOutputStream>
+
+// ❌ Missing JSDoc on public API breaks documentation generation
+createAudioOutputStream(opts?: AudioOutputStreamOpts): Promise<AudioOutputStream>
+````
 
 #### For code maintainers
 

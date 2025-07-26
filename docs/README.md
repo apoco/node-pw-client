@@ -33,16 +33,13 @@ This directory contains the comprehensive documentation for the PipeWire Node.js
 2. [Coding Style](CODING_STYLE.md) for code guidelines
 3. [Development Log](DEVLOG.md) for context and history
 
-## 📁 Examples
+## 🎵 Examples
 
-Live examples are available in the [`../examples/`](../examples/) directory:
+Complete working examples demonstrating various audio programming concepts:
 
-- `hello-pipewire.mts` - Basic stereo audio playback
-- `quality-demo.mts` - Demonstrates different quality levels
-- `sample-range-demo.mts` - Shows proper sample value ranges
-- `noise.mts` - Stereo noise generation
+- **[📁 Examples Directory](../examples/)** - Runnable code examples using `npx tsx`
 
-## 🔗 External Resources
+## External Resources
 
 - [PipeWire Documentation](https://docs.pipewire.org/)
 - [PipeWire Wiki](https://gitlab.freedesktop.org/pipewire/pipewire/-/wikis/home)
