@@ -1,5 +1,5 @@
 import EventEmitter, { once } from "node:events";
-import { AudioFormat, type OutputBuffer } from "./audio-format.mjs";
+import { AudioFormat } from "./audio-format.mjs";
 import {
   AudioQuality,
   getFormatPreferences,
@@ -10,9 +10,19 @@ import * as Props from "./props.mjs";
 import {
   type Latency,
   type StreamState,
+  type StreamStateEnum,
   streamStateToName,
 } from "./stream.mjs";
 import { adaptSamples } from "./format-negotiation.mjs";
+import {
+  BufferStrategy,
+  getBufferConfigForQuality,
+  type BufferConfig,
+} from "./buffer-config.mjs";
+import {
+  type StreamMetrics,
+  type DiagnosticEventInfo,
+} from "./stream-monitor.mjs";
 
 export interface NativeAudioOutputStream {
   connect: (options?: {
@@ -20,9 +30,11 @@ export interface NativeAudioOutputStream {
     preferredRates?: Array<number>;
   }) => Promise<void>;
   disconnect: () => Promise<void>;
+  get writableFrames(): number;
+  get framesPerQuantum(): number;
   get bufferSize(): number;
   write: (data: ArrayBuffer) => void;
-  isReady: () => Promise<number>;
+  waitForBuffer: () => Promise<number>; // Returns number of frames available for writing
   isFinished: () => Promise<void>;
   destroy: () => Promise<void>;
 }
@@ -39,6 +51,8 @@ export interface NativeAudioOutputStream {
  * @property preferredFormats - Override format negotiation order
  * @property preferredRates - Override sample rate negotiation order
  * @property autoConnect - Whether to auto-connect after creation (default: false)
+ * @property buffering - Buffer configuration for performance optimization
+ * @property enableMonitoring - Enable performance monitoring and diagnostics (default: false)
  *
  * @example
  * ```typescript
@@ -47,7 +61,8 @@ export interface NativeAudioOutputStream {
  *   rate: 44100,
  *   channels: 2,
  *   quality: AudioQuality.High,
- *   role: "Music"
+ *   role: "Music",
+ *   enableMonitoring: true
  * };
  * ```
  */
@@ -71,6 +86,8 @@ export interface AudioOutputStreamOpts {
   preferredFormats?: Array<AudioFormat>;
   preferredRates?: Array<number>;
   autoConnect?: boolean;
+  buffering?: BufferConfig;
+  enableMonitoring?: boolean;
 }
 
 export interface AudioOutputStreamProps {
@@ -95,6 +112,9 @@ interface AudioEvents {
   unknownParamChange: [number];
   stateChange: [StreamState];
   error: [Error];
+  performanceUpdate: [StreamMetrics];
+  diagnostic: [DiagnosticEventInfo];
+  bufferAdjusted: [{ oldSize: number; newSize: number; reason: string }];
 }
 
 /**
@@ -238,6 +258,16 @@ export interface AudioOutputStream extends EventEmitter<AudioEvents> {
   get rate(): number;
 
   /**
+   * Get the buffer size in bytes.
+   * This represents the total internal buffer size as negotiated
+   * and adjusted by quantum alignment. If you specified a specific
+   * number of bytes for buffering, the actual buffer may be different
+   * due to quantum boundary alignment requirements.
+   * Available only after successful connect().
+   */
+  get bufferSize(): number;
+
+  /**
    * Check if the stream is currently connected to PipeWire.
    */
   get isConnected(): boolean;
@@ -300,14 +330,18 @@ export class AudioOutputStreamImpl
       preferredFormats,
       preferredRates,
       autoConnect = false,
+      buffering,
+      enableMonitoring: _enableMonitoring = false,
     } = opts;
 
     this.#autoConnect = autoConnect;
     this.#connectionConfig = { quality, preferredFormats, preferredRates };
+
     this.#nativeStream = await this.#createNativeStream(session, {
       name,
       rate,
       channels,
+      buffering: this.#buildBufferingConfig(buffering, quality),
       props: this.#buildMediaProps(role),
     });
   }
@@ -325,6 +359,31 @@ export class AudioOutputStreamImpl
     return props;
   }
 
+  #buildBufferingConfig(
+    bufferConfig?: BufferConfig,
+    quality: AudioQuality = AudioQuality.Standard
+  ) {
+    const effectiveBufferConfig =
+      bufferConfig ?? getBufferConfigForQuality(quality);
+
+    switch (effectiveBufferConfig.strategy) {
+      case BufferStrategy.MinimalLatency:
+        return { requestedQuanta: 1 };
+      case BufferStrategy.LowLatency:
+        return { requestedQuanta: 2 };
+      case BufferStrategy.Balanced:
+        return { requestedQuanta: 4 };
+      case BufferStrategy.Smooth:
+        return { requestedQuanta: 8 };
+      case BufferStrategy.QuantumMultiplier:
+        return { requestedQuanta: effectiveBufferConfig.multiplier };
+      case BufferStrategy.MaxSize:
+        return { requestedBytes: effectiveBufferConfig.bytes };
+      case BufferStrategy.MaxLatency:
+        return { requestedMs: effectiveBufferConfig.milliseconds };
+    }
+  }
+
   async #createNativeStream(
     session: NativePipeWireSession,
     config: {
@@ -332,6 +391,11 @@ export class AudioOutputStreamImpl
       rate: number;
       channels: number;
       props: Record<string, string>;
+      buffering?: {
+        requestedQuanta?: number;
+        requestedBytes?: number;
+        requestedMs?: number;
+      };
     }
   ) {
     return await session.createAudioOutputStream({
@@ -341,16 +405,27 @@ export class AudioOutputStreamImpl
       rate: config.rate,
       channels: config.channels,
       props: config.props,
-      onStateChange: (state, error) => {
-        this.emit("stateChange", streamStateToName[state]);
+      buffering: config.buffering,
+      onStateChange: (state: StreamStateEnum, error: string) => {
+        const streamState = streamStateToName[state];
+        if (streamState) {
+          this.emit("stateChange", streamState);
+        }
         if (error) {
           this.emit("error", new Error(error));
         }
       },
-      onLatencyChange: (latency) => this.emit("latencyChange", latency),
-      onPropsChange: (props) => this.emit("propsChange", props),
-      onUnknownParamChange: (param) => this.emit("unknownParamChange", param),
-      onFormatChange: (format) => this.#handleFormatChange(format),
+      onLatencyChange: (latency: Latency) =>
+        this.emit("latencyChange", latency),
+      onPropsChange: (props: AudioOutputStreamProps) =>
+        this.emit("propsChange", props),
+      onUnknownParamChange: (param: number) =>
+        this.emit("unknownParamChange", param),
+      onFormatChange: (format: {
+        format: number;
+        channels: number;
+        rate: number;
+      }) => this.#handleFormatChange(format),
     });
   }
 
@@ -421,7 +496,6 @@ export class AudioOutputStreamImpl
       await this.connect();
     }
 
-    // Check if connected
     if (!this.#isConnected) {
       throw new Error(
         "Stream must be connected before writing audio data. Call await stream.connect() first."
@@ -432,30 +506,40 @@ export class AudioOutputStreamImpl
       samples = adaptSamples(samples, this.#negotiatedFormat);
     }
 
-    const bytesPerSample = this.#negotiatedFormat.byteSize;
-    let availableBytes = 0;
-    let numChunks = 0;
-    let offset = 0;
-    let output: OutputBuffer | null = null;
+    const framesPerQuantum = this.#nativeStream.framesPerQuantum;
+    const samplesPerQuantum = framesPerQuantum * this.#negotiatedChannels;
+
+    let quantumBuffer = this.#negotiatedFormat.BufferClass(samplesPerQuantum);
+    let quantumOffset = 0;
+    let availableFrames = this.#nativeStream.writableFrames;
 
     for (const sample of samples) {
-      if (offset >= numChunks && output) {
-        this.#nativeStream.write(output.subarray(0, offset).buffer);
-        output = null;
-      }
+      quantumBuffer.set(quantumOffset++, sample);
 
-      if (!output) {
-        availableBytes = await this.#nativeStream.isReady();
-        numChunks = Math.floor(availableBytes / bytesPerSample);
-        output = this.#negotiatedFormat.BufferClass(numChunks);
-        offset = 0;
-      }
+      if (quantumOffset >= samplesPerQuantum) {
+        if (availableFrames < framesPerQuantum) {
+          availableFrames = await this.#nativeStream.waitForBuffer();
+        }
 
-      output.set(offset++, sample);
+        this.#nativeStream.write(quantumBuffer.buffer);
+        availableFrames -= framesPerQuantum;
+
+        // Reset for next quantum
+        quantumBuffer = this.#negotiatedFormat.BufferClass(samplesPerQuantum);
+        quantumOffset = 0;
+      }
     }
 
-    if (output) {
-      this.#nativeStream.write(output.subarray(0, offset).buffer);
+    // Send any remaining partial quantum
+    if (quantumOffset > 0) {
+      const partialFrames = Math.ceil(quantumOffset / this.#negotiatedChannels);
+
+      // If no buffer space available for the partial quantum, wait for it
+      if (availableFrames < partialFrames) {
+        await this.#nativeStream.waitForBuffer();
+      }
+
+      this.#nativeStream.write(quantumBuffer.subarray(0, quantumOffset).buffer);
     }
   }
 
@@ -473,6 +557,10 @@ export class AudioOutputStreamImpl
 
   get rate(): number {
     return this.#negotiatedRate;
+  }
+
+  get bufferSize(): number {
+    return this.#nativeStream.bufferSize;
   }
 
   async dispose() {

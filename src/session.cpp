@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iostream>
 #include <napi.h>
 #include <pipewire/keys.h>
@@ -70,6 +71,33 @@ void PipeWireSession::withThreadLock(std::function<void()> fn)
     pw_thread_loop_lock(loop);
     fn();
     pw_thread_loop_unlock(loop);
+}
+
+uint32_t PipeWireSession::getFramesPerQuantum()
+{
+    // Get the global quantum from PipeWire core
+    // This is the system-wide processing block size
+    uint32_t quantum = 256; // Default fallback
+
+    withThreadLock([this, &quantum]() {
+        if (core) {
+            // Query the core properties to get the quantum
+            const struct pw_properties* props = pw_core_get_properties(core);
+            if (props) {
+                const char* quantum_str = pw_properties_get(props, "clock.quantum");
+                if (quantum_str) {
+                    quantum = atoi(quantum_str);
+                    // Validate quantum is reasonable
+                    if (quantum < 32)
+                        quantum = 32;
+                    if (quantum > 2048)
+                        quantum = 2048;
+                }
+            }
+        }
+    });
+
+    return quantum;
 }
 
 Napi::Value PipeWireSession::start(const Napi::CallbackInfo& info)

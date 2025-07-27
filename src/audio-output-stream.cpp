@@ -56,6 +56,16 @@ Napi::Function AudioOutputStream::init(Napi::Env env)
                 "disconnect",
                 napi_enumerable),
             InstanceAccessor(
+                "writableFrames",
+                &AudioOutputStream::getWritableFrames,
+                NULL,
+                napi_enumerable),
+            InstanceAccessor(
+                "framesPerQuantum",
+                &AudioOutputStream::getFramesPerQuantum,
+                NULL,
+                napi_enumerable),
+            InstanceAccessor(
                 "bufferSize",
                 &AudioOutputStream::getBufferSize,
                 NULL,
@@ -63,8 +73,8 @@ Napi::Function AudioOutputStream::init(Napi::Env env)
             InstanceMethod<&AudioOutputStream::write>(
                 "write",
                 napi_enumerable),
-            InstanceMethod<&AudioOutputStream::isReady>(
-                "isReady",
+            InstanceMethod<&AudioOutputStream::waitForBuffer>(
+                "waitForBuffer",
                 napi_enumerable),
             InstanceMethod<&AudioOutputStream::isFinished>(
                 "isFinished",
@@ -88,8 +98,12 @@ AudioOutputStream::AudioOutputStream(const Napi::CallbackInfo& info)
     , bytesPerSample(DEFAULT_BYTE_DEPTH)
     , rate(DEFAULT_RATE)
     , channels(DEFAULT_CHANNELS)
-    , frameBufferSize(2048)
+    , frameBufferSize(DEFAULT_BUFFER_SIZE) // Will be configured in create()
     , queuedFrameCount(0)
+    , requestedBufferSizeBytes(0) // 0 means no specific byte count requested
+    , requestedBufferedQuanta(4) // Default multiplier
+    , requestedLatencyMs(0.0) // 0.0 means no specific latency requested
+    , framesPerQuantum(256) // Default quantum, will be set from session during create()
     , currentBufferOffset(0)
     , stateChangedCallback(NULL)
     , paramChangedCallback(NULL)
@@ -117,15 +131,30 @@ Napi::Promise AudioOutputStream::create(PipeWireSession* session, const Napi::Ob
 
     auto name = options.Get("name").As<Napi::String>().Utf8Value();
     auto properties = getStreamProps(options);
-
     props = Napi::ObjectReference::New(Napi::Object::New(env), 1);
+
+    // Extract buffer configuration values for async processing
+    if (options.Get("buffering").IsObject()) {
+        auto buffering = options.Get("buffering").As<Napi::Object>();
+
+        if (buffering.Get("requestedBytes").IsNumber()) {
+            requestedBufferSizeBytes = buffering.Get("requestedBytes").As<Napi::Number>().Uint32Value();
+        } else if (buffering.Get("requestedQuanta").IsNumber()) {
+            requestedBufferedQuanta = buffering.Get("requestedQuanta").As<Napi::Number>().Uint32Value();
+            if (requestedBufferedQuanta < 1)
+                requestedBufferedQuanta = 1;
+        } else if (buffering.Get("requestedMs").IsNumber()) {
+            requestedLatencyMs = buffering.Get("requestedMs").As<Napi::Number>().DoubleValue();
+        }
+    }
 
     initCallbacks(options);
 
     Ref();
     return async(
         env,
-        [this, name, properties]() {
+        [this, session, name, properties]() {
+            framesPerQuantum = session->getFramesPerQuantum();
             initStream(name, properties);
         },
         [this]() {
@@ -174,6 +203,29 @@ void AudioOutputStream::initStream(std::string name, pw_properties* properties)
             &stream_events,
             this);
     });
+}
+
+void AudioOutputStream::setBufferSize()
+{
+    uint32_t quanta;
+    if (requestedBufferSizeBytes > 0) {
+        // Convert bytes to quanta
+        uint32_t bytesPerFrame = bytesPerSample * channels;
+        uint32_t requestedFrames = requestedBufferSizeBytes / bytesPerFrame;
+        quanta = requestedFrames / framesPerQuantum;
+    } else if (requestedLatencyMs > 0.0) {
+        // Convert milliseconds to quanta
+        uint32_t requestedFrames = static_cast<uint32_t>(requestedLatencyMs * rate / 1000.0);
+        quanta = requestedFrames / framesPerQuantum;
+    } else {
+        // Use quantum-based sizing directly
+        quanta = requestedBufferedQuanta;
+    }
+
+    if (quanta < 1) {
+        quanta = 1; // Ensure at least one quantum
+    }
+    frameBufferSize = quanta * framesPerQuantum;
 }
 
 std::vector<spa_audio_format> AudioOutputStream::parsePreferredFormats(const Napi::Object& options)
@@ -348,11 +400,21 @@ uint32_t AudioOutputStream::getBytesPerFrame()
     return bytesPerSample * channels;
 }
 
-Napi::Value AudioOutputStream::getBufferSize(const Napi::CallbackInfo& info)
+Napi::Value AudioOutputStream::getWritableFrames(const Napi::CallbackInfo& info)
 {
     auto availableFrames = (long)frameBufferSize - queuedFrameCount;
-    auto availableBytes = availableFrames * getBytesPerFrame();
-    return Napi::Number::New(info.Env(), std::max((long)0, availableBytes));
+    return Napi::Number::New(info.Env(), std::max((long)0, availableFrames));
+}
+
+Napi::Value AudioOutputStream::getFramesPerQuantum(const Napi::CallbackInfo& info)
+{
+    return Napi::Number::New(info.Env(), framesPerQuantum);
+}
+
+Napi::Value AudioOutputStream::getBufferSize(const Napi::CallbackInfo& info)
+{
+    uint32_t bufferSizeBytes = this->frameBufferSize * this->getBytesPerFrame();
+    return Napi::Number::New(info.Env(), bufferSizeBytes);
 }
 
 void AudioOutputStream::onStateChange(pw_stream_state state, const char* error)
@@ -525,26 +587,20 @@ void AudioOutputStream::onFormatChange(const spa_pod* param)
     auto newChannels = audioInfo.channels;
     auto newFormat = audioInfo.format;
 
-    // Calculate bytes per sample for the new format
     uint32_t newBytesPerSample;
     switch (newFormat) {
     case SPA_AUDIO_FORMAT_F64:
         newBytesPerSample = 8;
         break;
-    case SPA_AUDIO_FORMAT_F32:
-        newBytesPerSample = 4;
-        break;
-    case SPA_AUDIO_FORMAT_S32:
-    case SPA_AUDIO_FORMAT_U32:
-    case SPA_AUDIO_FORMAT_S24_32:
-        newBytesPerSample = 4;
-        break;
     case SPA_AUDIO_FORMAT_S16:
     case SPA_AUDIO_FORMAT_U16:
         newBytesPerSample = 2;
         break;
+    case SPA_AUDIO_FORMAT_F32:
+    case SPA_AUDIO_FORMAT_S32:
+    case SPA_AUDIO_FORMAT_U32:
+    case SPA_AUDIO_FORMAT_S24_32:
     default:
-        // Default to 4 bytes for unknown formats
         newBytesPerSample = 4;
         break;
     }
@@ -554,6 +610,7 @@ void AudioOutputStream::onFormatChange(const spa_pod* param)
         channels = newChannels;
         format = newFormat;
         bytesPerSample = newBytesPerSample;
+        setBufferSize();
 
         formatChangeCallback.NonBlockingCall([this](const Napi::Env env, Napi::Function jsCallback) {
             auto formatObj = Napi::Object::New(env);
@@ -631,14 +688,13 @@ Napi::Value AudioOutputStream::write(const Napi::CallbackInfo& info)
     return env.Undefined();
 }
 
-Napi::Value AudioOutputStream::isReady(const Napi::CallbackInfo& info)
+Napi::Value AudioOutputStream::waitForBuffer(const Napi::CallbackInfo& info)
 {
     auto env = info.Env();
     auto availableFrames = (long)frameBufferSize - queuedFrameCount;
-    auto availableBytes = availableFrames * getBytesPerFrame();
 
-    if (availableBytes > 0) {
-        return resolved(Napi::Number::New(env, availableBytes));
+    if (availableFrames > 0) {
+        return resolved(Napi::Number::New(env, availableFrames));
     }
 
     if (!readyDeferral) {
@@ -654,9 +710,8 @@ Napi::Value AudioOutputStream::isReady(const Napi::CallbackInfo& info)
             Napi::Function::New(env, [this](const Napi::CallbackInfo& info) {
                 auto env = info.Env();
                 auto availableFrames = (long)frameBufferSize - queuedFrameCount;
-                auto availableBytes = availableFrames * getBytesPerFrame();
-                if (availableBytes > 0) {
-                    readyDeferral->Resolve(Napi::Number::New(env, availableBytes));
+                if (availableFrames > 0) {
+                    readyDeferral->Resolve(Napi::Number::New(env, availableFrames));
                     delete readyDeferral;
                     readyDeferral = NULL;
                 }

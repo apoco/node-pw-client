@@ -1,7 +1,6 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
-import { read } from "fs";
 
 export default tseslint.config(
   // Base JavaScript rules

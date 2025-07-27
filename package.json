@@ -37,12 +37,13 @@
     "typescript-eslint": "^8.37.0"
   },
   "scripts": {
-    "build": "npm run build:native:debug && npx tsc --project tsconfig.build.json",
+    "build": "npm run build:native:debug && npm run build:js",
     "build:native": "node-gyp build",
     "build:native:debug": "npm run build:native -- --debug",
+    "build:js": "tsc --project tsconfig.build.json",
     "docs:generate": "npm run docs:examples && npm run docs:api",
     "docs:examples": "tsx scripts/generate-docs.mts",
-    "docs:api": "npx typedoc",
+    "docs:api": "typedoc",
     "test:snippets": "tsx scripts/test-examples.mts",
     "test": "npm run test:snippets",
     "lint": "eslint .snippets lib scripts --ext .mts",

@@ -25,6 +25,11 @@ export interface NativePipeWireSession {
     bytesPerSample: number;
     rate: number;
     channels: number;
+    buffering?: {
+      requestedQuanta?: number;
+      requestedBytes?: number;
+      requestedMs?: number;
+    };
     props: Record<string, string>;
     onStateChange: (state: StreamStateEnum, error: string) => void;
     onPropsChange: (props: AudioOutputStreamProps) => void;

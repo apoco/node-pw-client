@@ -28,8 +28,10 @@ public:
     // JS-callable
     Napi::Value connect(const Napi::CallbackInfo& info);
     Napi::Value disconnect(const Napi::CallbackInfo& info);
+    Napi::Value getWritableFrames(const Napi::CallbackInfo& info);
+    Napi::Value getFramesPerQuantum(const Napi::CallbackInfo& info);
     Napi::Value getBufferSize(const Napi::CallbackInfo& info);
-    Napi::Value isReady(const Napi::CallbackInfo& info);
+    Napi::Value waitForBuffer(const Napi::CallbackInfo& info);
     Napi::Value isFinished(const Napi::CallbackInfo& info);
     Napi::Value write(const Napi::CallbackInfo& info);
     Napi::Value destroy(const Napi::CallbackInfo& info);
@@ -59,6 +61,13 @@ private:
 
     uint frameBufferSize;
     uint queuedFrameCount;
+
+    // Buffer sizing - track both requested bytes and quantum-based sizing
+    uint32_t requestedBufferSizeBytes; // User-requested buffer size in bytes (0 if not specified)
+    uint32_t requestedBufferedQuanta; // Quantum multiplier for buffer calculation
+    double requestedLatencyMs; // User-requested latency in milliseconds (0.0 if not specified)
+
+    uint32_t framesPerQuantum;
     std::queue<Napi::Reference<Napi::ArrayBuffer>> bufferRefs;
     std::queue<js_buffer> buffers;
     uint currentBufferOffset;
@@ -84,6 +93,8 @@ private:
 
     void initCallbacks(const Napi::Object& options);
     void initStream(std::string name, pw_properties* properties);
+
+    void setBufferSize(); // Calculate buffer size after format negotiation
 
     void setProps(Napi::Env env, const spa_pod_object* properties);
     void setProp(const char* key, spa_pod* value);

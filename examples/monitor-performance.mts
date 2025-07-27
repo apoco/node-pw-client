@@ -240,7 +240,6 @@ async function memoryUsageTest(quality: AudioQuality) {
     `After connection: ${formatBytes(afterConnectionMemory.heapUsed)}`,
   );
 
-  // Process larger amount of audio
   function* largeSignal() {
     const samples = 2 * stream.rate * stream.channels; // 2 seconds
     for (let i = 0; i < samples; i++) {

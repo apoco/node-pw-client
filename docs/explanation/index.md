@@ -29,6 +29,17 @@ Why we chose quality levels over technical audio formats.
 - Developer experience improvements
 - Automatic format negotiation
 
+### 🎛️ [Buffer Configuration Concepts](buffer-configuration.md)
+
+Understanding audio buffering, latency trade-offs, and buffer management design.
+
+**Explains:**
+
+- What audio buffering is and why it matters
+- The fundamental trade-off between latency, reliability, and memory
+- PipeWire's quantum system and its impact on buffer sizing
+- Design philosophy behind buffer strategies
+
 ### 🔧 [Resource Management](resource-management.md)
 
 Understanding resource management patterns for different Node.js versions.

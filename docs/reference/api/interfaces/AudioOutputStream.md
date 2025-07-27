@@ -4,7 +4,7 @@
 
 # Interface: AudioOutputStream
 
-Defined in: audio-output-stream.mts:191
+Defined in: audio-output-stream.mts:206
 
 Audio output stream for playing audio samples to PipeWire.
 Streams are event emitters that provide real-time feedback about format changes,
@@ -106,7 +106,7 @@ stream.on('unknownParamChange', (paramId) => {
 
 > **connect**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:196
+Defined in: audio-output-stream.mts:211
 
 Connect the stream to PipeWire audio system.
 Triggers format negotiation and initializes audio processing.
@@ -121,7 +121,7 @@ Triggers format negotiation and initializes audio processing.
 
 > **disconnect**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:202
+Defined in: audio-output-stream.mts:217
 
 Disconnect the stream from PipeWire.
 Stops audio processing and releases resources.
@@ -136,7 +136,7 @@ Stops audio processing and releases resources.
 
 > **write**: (`samples`) => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:208
+Defined in: audio-output-stream.mts:223
 
 Write audio samples to the stream.
 Samples are JavaScript Numbers (-1.0 to 1.0) converted to negotiated format.
@@ -157,7 +157,7 @@ Samples are JavaScript Numbers (-1.0 to 1.0) converted to negotiated format.
 
 > **isFinished**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:214
+Defined in: audio-output-stream.mts:229
 
 Wait for all buffered audio to finish playing.
 Useful for ensuring complete playback before cleanup.
@@ -172,7 +172,7 @@ Useful for ensuring complete playback before cleanup.
 
 > **dispose**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:220
+Defined in: audio-output-stream.mts:235
 
 Dispose of the stream and release all resources.
 Alternative to disconnect() for final cleanup.
@@ -187,7 +187,7 @@ Alternative to disconnect() for final cleanup.
 
 > **\[asyncDispose\]**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:249
+Defined in: audio-output-stream.mts:264
 
 Automatic resource cleanup for `await using` syntax.
 Equivalent to calling dispose().
@@ -204,7 +204,7 @@ Equivalent to calling dispose().
 
 > **get** **format**(): [`AudioFormat`](../classes/AudioFormat.md)
 
-Defined in: audio-output-stream.mts:226
+Defined in: audio-output-stream.mts:241
 
 Get the negotiated audio format after connection.
 Available only after successful connect().
@@ -221,7 +221,7 @@ Available only after successful connect().
 
 > **get** **channels**(): `number`
 
-Defined in: audio-output-stream.mts:232
+Defined in: audio-output-stream.mts:247
 
 Get the negotiated number of audio channels.
 Available only after successful connect().
@@ -238,7 +238,7 @@ Available only after successful connect().
 
 > **get** **rate**(): `number`
 
-Defined in: audio-output-stream.mts:238
+Defined in: audio-output-stream.mts:253
 
 Get the negotiated sample rate in Hz.
 Available only after successful connect().
@@ -255,7 +255,7 @@ Available only after successful connect().
 
 > **get** **isConnected**(): `boolean`
 
-Defined in: audio-output-stream.mts:243
+Defined in: audio-output-stream.mts:258
 
 Check if the stream is currently connected to PipeWire.
 

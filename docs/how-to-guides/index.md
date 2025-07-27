@@ -14,6 +14,17 @@ Select the optimal quality level for your application's requirements.
 - Optimizing for different use cases (music production, games, system sounds)
 - Balancing quality vs. performance
 
+### 🎛️ [Choose Buffer Configuration](choose-buffer-configuration.md)
+
+Select the optimal buffer strategy for your latency, memory, and reliability requirements.
+
+**When to use:**
+
+- Balancing performance trade-offs between latency and reliability
+- Configuring real-time audio applications with specific latency needs
+- Managing memory usage in resource-constrained environments
+- Troubleshooting audio dropouts or excessive latency
+
 ### ⚡ [Optimize for Low Latency](optimize-latency.md)
 
 Minimize audio latency for real-time applications.

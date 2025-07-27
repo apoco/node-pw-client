@@ -17,6 +17,7 @@ public:
 
     void withThreadLock(std::function<void()> fn);
     pw_loop* getLoop();
+    uint32_t getFramesPerQuantum();
 
     Napi::Value createAudioOutputStream(const Napi::CallbackInfo& info);
 
