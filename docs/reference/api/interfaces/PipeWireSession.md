@@ -4,7 +4,7 @@
 
 # Interface: PipeWireSession
 
-Defined in: session.mts:62
+Defined in: [session.mts:67](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/session.mts#L67)
 
 PipeWire session that manages the connection to the PipeWire audio server.
 
@@ -32,7 +32,7 @@ await session.dispose();
 
 > **createAudioOutputStream**(`opts?`): `Promise`\<[`AudioOutputStream`](AudioOutputStream.md)\>
 
-Defined in: session.mts:99
+Defined in: [session.mts:104](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/session.mts#L104)
 
 Creates a new audio output stream.
 
@@ -70,7 +70,7 @@ const stream = await session.createAudioOutputStream({
 
 > **dispose**(): `Promise`\<`void`\>
 
-Defined in: session.mts:116
+Defined in: [session.mts:121](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/session.mts#L121)
 
 Disposes the session and releases PipeWire resources.
 
@@ -89,7 +89,7 @@ Promise that resolves when cleanup is complete
 
 > **\[asyncDispose\]**(): `Promise`\<`void`\>
 
-Defined in: session.mts:126
+Defined in: [session.mts:131](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/session.mts#L131)
 
 Automatic resource cleanup for `await using` syntax.
 

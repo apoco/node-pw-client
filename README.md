@@ -11,6 +11,31 @@ Node.js library for PipeWire audio programming. Build audio applications, synthe
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+This library requires PipeWire development libraries to be installed on your system:
+
+#### Ubuntu/Debian
+
+```bash
+sudo apt update
+sudo apt install libpipewire-0.3-dev pkg-config
+```
+
+#### Fedora/RHEL/Rocky Linux
+
+```bash
+sudo dnf install pipewire-devel pkgconf-pkg-config
+```
+
+#### Arch Linux
+
+```bash
+sudo pacman -S pipewire pkg-config
+```
+
+### Installation
+
 ```bash
 npm install pw-client
 ```
@@ -95,7 +120,40 @@ Check out the [`examples/`](examples/) directory for complete working demos. Use
 npx tsx examples/getting-started.mts
 ```
 
-## 📋 Prerequisites
+## � Troubleshooting
+
+### Installation Issues
+
+**"Package 'pipewire-0.3' not found"**
+
+- Install PipeWire development headers (see Prerequisites above)
+- Verify with: `pkg-config --exists pipewire-0.3 && echo "PipeWire found"`
+
+**"node-gyp rebuild failed"**
+
+- Ensure you have build tools: `sudo apt install build-essential` (Ubuntu/Debian)
+- Check Node.js version: `node --version` (requires >= 22.0.0)
+- Try cleaning build cache: `npm run build:native --clean`
+
+**"libpipewire-0.3.so not found at runtime"**
+
+- Install PipeWire runtime: `sudo apt install pipewire` (Ubuntu/Debian)
+- Check if PipeWire is running: `systemctl --user status pipewire`
+
+### Runtime Issues
+
+**"Failed to connect to PipeWire daemon"**
+
+- Ensure PipeWire is running: `systemctl --user start pipewire`
+- Check permissions: Your user should be in the `audio` group
+
+**For more help:**
+
+- Check the [troubleshooting guide](docs/how-to-guides/troubleshooting.md)
+- Search [existing issues](https://github.com/apoco/node-pw-client/issues)
+- Ask on [GitHub Discussions](https://github.com/apoco/node-pw-client/discussions)
+
+## �📋 Prerequisites
 
 - **Linux with PipeWire** - PipeWire 0.3+ required
 - **Node.js 22+** - ES modules and modern features required

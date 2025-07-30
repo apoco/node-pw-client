@@ -19,10 +19,6 @@ import {
   getBufferConfigForQuality,
   type BufferConfig,
 } from "./buffer-config.mjs";
-import {
-  type StreamMetrics,
-  type DiagnosticEventInfo,
-} from "./stream-monitor.mjs";
 
 export interface NativeAudioOutputStream {
   connect: (options?: {
@@ -112,8 +108,6 @@ interface AudioEvents {
   unknownParamChange: [number];
   stateChange: [StreamState];
   error: [Error];
-  performanceUpdate: [StreamMetrics];
-  diagnostic: [DiagnosticEventInfo];
   bufferAdjusted: [{ oldSize: number; newSize: number; reason: string }];
 }
 

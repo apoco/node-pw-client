@@ -4,7 +4,7 @@
 
 # Class: AudioFormat
 
-Defined in: audio-format.mts:103
+Defined in: [audio-format.mts:103](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L103)
 
 Audio format class representing different sample formats supported by PipeWire.
 Handles conversion between JavaScript Numbers and various binary audio formats.
@@ -29,7 +29,7 @@ console.log(`Channels: ${stream.channels}`);
 
 > `static` **Int8**: `AudioFormat`
 
-Defined in: audio-format.mts:144
+Defined in: [audio-format.mts:144](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L144)
 
 ***
 
@@ -37,7 +37,7 @@ Defined in: audio-format.mts:144
 
 > `static` **Uint8**: `AudioFormat`
 
-Defined in: audio-format.mts:150
+Defined in: [audio-format.mts:150](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L150)
 
 ***
 
@@ -45,7 +45,7 @@ Defined in: audio-format.mts:150
 
 > `static` **ULaw**: `AudioFormat`
 
-Defined in: audio-format.mts:221
+Defined in: [audio-format.mts:221](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L221)
 
 ***
 
@@ -53,7 +53,7 @@ Defined in: audio-format.mts:221
 
 > `static` **ALaw**: `AudioFormat`
 
-Defined in: audio-format.mts:222
+Defined in: [audio-format.mts:222](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L222)
 
 ***
 
@@ -61,7 +61,7 @@ Defined in: audio-format.mts:222
 
 > `static` **Uint8Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:224
+Defined in: [audio-format.mts:224](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L224)
 
 ***
 
@@ -69,7 +69,7 @@ Defined in: audio-format.mts:224
 
 > `static` **Int16Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:230
+Defined in: [audio-format.mts:230](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L230)
 
 ***
 
@@ -77,7 +77,7 @@ Defined in: audio-format.mts:230
 
 > `static` **Int24\_32Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:236
+Defined in: [audio-format.mts:236](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L236)
 
 ***
 
@@ -85,7 +85,7 @@ Defined in: audio-format.mts:236
 
 > `static` **Int32Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:242
+Defined in: [audio-format.mts:242](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L242)
 
 ***
 
@@ -93,7 +93,7 @@ Defined in: audio-format.mts:242
 
 > `static` **Float32Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:249
+Defined in: [audio-format.mts:249](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L249)
 
 ***
 
@@ -101,7 +101,7 @@ Defined in: audio-format.mts:249
 
 > `static` **Float64Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:255
+Defined in: [audio-format.mts:255](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L255)
 
 ***
 
@@ -109,7 +109,7 @@ Defined in: audio-format.mts:255
 
 > `static` **Int8Planar**: `AudioFormat`
 
-Defined in: audio-format.mts:261
+Defined in: [audio-format.mts:261](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L261)
 
 ## Accessors
 
@@ -119,7 +119,7 @@ Defined in: audio-format.mts:261
 
 > **get** **enumValue**(): `number`
 
-Defined in: audio-format.mts:122
+Defined in: [audio-format.mts:122](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L122)
 
 ##### Returns
 
@@ -133,7 +133,7 @@ Defined in: audio-format.mts:122
 
 > **get** **byteSize**(): `number`
 
-Defined in: audio-format.mts:126
+Defined in: [audio-format.mts:126](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L126)
 
 ##### Returns
 
@@ -147,7 +147,7 @@ Defined in: audio-format.mts:126
 
 > **get** **BufferClass**(): `OutputBufferFactory`
 
-Defined in: audio-format.mts:130
+Defined in: [audio-format.mts:130](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L130)
 
 ##### Returns
 
@@ -161,7 +161,7 @@ Defined in: audio-format.mts:130
 
 > **get** **description**(): `string`
 
-Defined in: audio-format.mts:134
+Defined in: [audio-format.mts:134](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L134)
 
 ##### Returns
 
@@ -175,7 +175,7 @@ Defined in: audio-format.mts:134
 
 > **get** `static` **Int16**(): `AudioFormat`
 
-Defined in: audio-format.mts:157
+Defined in: [audio-format.mts:157](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L157)
 
 ##### Returns
 
@@ -189,7 +189,7 @@ Defined in: audio-format.mts:157
 
 > **get** `static` **Uint16**(): `AudioFormat`
 
-Defined in: audio-format.mts:161
+Defined in: [audio-format.mts:161](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L161)
 
 ##### Returns
 
@@ -203,7 +203,7 @@ Defined in: audio-format.mts:161
 
 > **get** `static` **Int24\_32**(): `AudioFormat`
 
-Defined in: audio-format.mts:165
+Defined in: [audio-format.mts:165](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L165)
 
 ##### Returns
 
@@ -217,7 +217,7 @@ Defined in: audio-format.mts:165
 
 > **get** `static` **Uint24\_32**(): `AudioFormat`
 
-Defined in: audio-format.mts:171
+Defined in: [audio-format.mts:171](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L171)
 
 ##### Returns
 
@@ -231,7 +231,7 @@ Defined in: audio-format.mts:171
 
 > **get** `static` **Int32**(): `AudioFormat`
 
-Defined in: audio-format.mts:177
+Defined in: [audio-format.mts:177](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L177)
 
 ##### Returns
 
@@ -245,7 +245,7 @@ Defined in: audio-format.mts:177
 
 > **get** `static` **Uint32**(): `AudioFormat`
 
-Defined in: audio-format.mts:181
+Defined in: [audio-format.mts:181](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L181)
 
 ##### Returns
 
@@ -259,7 +259,7 @@ Defined in: audio-format.mts:181
 
 > **get** `static` **Float32**(): `AudioFormat`
 
-Defined in: audio-format.mts:209
+Defined in: [audio-format.mts:209](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L209)
 
 ##### Returns
 
@@ -273,7 +273,7 @@ Defined in: audio-format.mts:209
 
 > **get** `static` **Float64**(): `AudioFormat`
 
-Defined in: audio-format.mts:215
+Defined in: [audio-format.mts:215](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L215)
 
 ##### Returns
 
@@ -285,7 +285,7 @@ Defined in: audio-format.mts:215
 
 > `static` **fromEnum**(`format`): `undefined` \| `AudioFormat`
 
-Defined in: audio-format.mts:140
+Defined in: [audio-format.mts:140](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-format.mts#L140)
 
 #### Parameters
 

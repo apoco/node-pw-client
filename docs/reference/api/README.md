@@ -7,6 +7,7 @@
 ## Enumerations
 
 - [AudioQuality](enumerations/AudioQuality.md)
+- [BufferStrategy](enumerations/BufferStrategy.md)
 
 ## Classes
 

@@ -4,7 +4,7 @@
 
 # Interface: AudioOutputStream
 
-Defined in: audio-output-stream.mts:206
+Defined in: [audio-output-stream.mts:205](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L205)
 
 Audio output stream for playing audio samples to PipeWire.
 Streams are event emitters that provide real-time feedback about format changes,
@@ -106,7 +106,7 @@ stream.on('unknownParamChange', (paramId) => {
 
 > **connect**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:211
+Defined in: [audio-output-stream.mts:210](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L210)
 
 Connect the stream to PipeWire audio system.
 Triggers format negotiation and initializes audio processing.
@@ -121,7 +121,7 @@ Triggers format negotiation and initializes audio processing.
 
 > **disconnect**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:217
+Defined in: [audio-output-stream.mts:216](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L216)
 
 Disconnect the stream from PipeWire.
 Stops audio processing and releases resources.
@@ -136,7 +136,7 @@ Stops audio processing and releases resources.
 
 > **write**: (`samples`) => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:223
+Defined in: [audio-output-stream.mts:222](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L222)
 
 Write audio samples to the stream.
 Samples are JavaScript Numbers (-1.0 to 1.0) converted to negotiated format.
@@ -157,7 +157,7 @@ Samples are JavaScript Numbers (-1.0 to 1.0) converted to negotiated format.
 
 > **isFinished**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:229
+Defined in: [audio-output-stream.mts:228](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L228)
 
 Wait for all buffered audio to finish playing.
 Useful for ensuring complete playback before cleanup.
@@ -172,7 +172,7 @@ Useful for ensuring complete playback before cleanup.
 
 > **dispose**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:235
+Defined in: [audio-output-stream.mts:234](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L234)
 
 Dispose of the stream and release all resources.
 Alternative to disconnect() for final cleanup.
@@ -187,7 +187,7 @@ Alternative to disconnect() for final cleanup.
 
 > **\[asyncDispose\]**: () => `Promise`\<`void`\>
 
-Defined in: audio-output-stream.mts:264
+Defined in: [audio-output-stream.mts:273](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L273)
 
 Automatic resource cleanup for `await using` syntax.
 Equivalent to calling dispose().
@@ -204,7 +204,7 @@ Equivalent to calling dispose().
 
 > **get** **format**(): [`AudioFormat`](../classes/AudioFormat.md)
 
-Defined in: audio-output-stream.mts:241
+Defined in: [audio-output-stream.mts:240](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L240)
 
 Get the negotiated audio format after connection.
 Available only after successful connect().
@@ -221,7 +221,7 @@ Available only after successful connect().
 
 > **get** **channels**(): `number`
 
-Defined in: audio-output-stream.mts:247
+Defined in: [audio-output-stream.mts:246](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L246)
 
 Get the negotiated number of audio channels.
 Available only after successful connect().
@@ -238,9 +238,30 @@ Available only after successful connect().
 
 > **get** **rate**(): `number`
 
-Defined in: audio-output-stream.mts:253
+Defined in: [audio-output-stream.mts:252](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L252)
 
 Get the negotiated sample rate in Hz.
+Available only after successful connect().
+
+##### Returns
+
+`number`
+
+***
+
+### bufferSize
+
+#### Get Signature
+
+> **get** **bufferSize**(): `number`
+
+Defined in: [audio-output-stream.mts:262](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L262)
+
+Get the buffer size in bytes.
+This represents the total internal buffer size as negotiated
+and adjusted by quantum alignment. If you specified a specific
+number of bytes for buffering, the actual buffer may be different
+due to quantum boundary alignment requirements.
 Available only after successful connect().
 
 ##### Returns
@@ -255,7 +276,7 @@ Available only after successful connect().
 
 > **get** **isConnected**(): `boolean`
 
-Defined in: audio-output-stream.mts:258
+Defined in: [audio-output-stream.mts:267](https://github.com/apoco/node-pw-client/blob/d59499190db38fc8e9b9fab4394158a6e7041400/lib/audio-output-stream.mts#L267)
 
 Check if the stream is currently connected to PipeWire.
 

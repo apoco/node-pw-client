@@ -17,12 +17,11 @@
       "include_dirs": [
         "<!(node -p \"require('node-addon-api').include\")",
         "<!(node -e \"require('node-addon-api').gyp\")",
-        "/usr/include/pipewire-0.3",
-        "/usr/include/spa-0.2",
+        "<!@(pkg-config --cflags-only-I libpipewire-0.3 2>/dev/null | sed 's/-I//g' || echo '/usr/include/pipewire-0.3 /usr/include/spa-0.2')",
       ],
       "link_settings": {
         "libraries": [
-          "/usr/lib/x86_64-linux-gnu/libpipewire-0.3.so"
+          "<!@(pkg-config --libs libpipewire-0.3 2>/dev/null || echo '-lpipewire-0.3')"
         ]
       },
     }

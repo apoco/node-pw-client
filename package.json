@@ -9,6 +9,10 @@
   ],
   "author": "Jacob Page <jacob.h.page@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/apoco/node-pw-client"
+  },
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -19,6 +23,9 @@
       "import": "./dist/index.mjs"
     }
   },
+  "dependencies": {
+    "node-addon-api": "^8.3.1"
+  },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
     "@tsconfig/node22": "^22.0.1",
@@ -27,7 +34,6 @@
     "eslint": "^9.31.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.3",
-    "node-addon-api": "^8.3.1",
     "node-gyp": "^11.2.0",
     "prettier": "^3.5.3",
     "tsx": "^4.19.4",
@@ -36,7 +42,23 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.37.0"
   },
+  "gypfile": true,
+  "binary": {
+    "napi_versions": [8]
+  },
+  "os": [
+    "linux"
+  ],
+  "files": [
+    "dist/",
+    "lib/",
+    "src/",
+    "binding.gyp",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
+    "install": "node-gyp rebuild",
     "build": "npm run build:native:debug && npm run build:js",
     "build:native": "node-gyp build",
     "build:native:debug": "npm run build:native -- --debug",
